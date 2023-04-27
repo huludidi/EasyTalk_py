@@ -19,4 +19,5 @@ MAIL_USERNAME = "1398471354@qq.com"
 MAIL_PASSWORD = "bpsgwtwvwnxriahi"
 MAIL_DEFAULT_SENDER = "1398471354@qq.com"
 
+
 # ziefppvnudayfhda

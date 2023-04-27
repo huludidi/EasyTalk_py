@@ -1,36 +1,36 @@
+import datetime
+
 import wtforms
-from wtforms.validators import Email, Length, EqualTo, InputRequired
+
+from wtforms import Form
+from wtforms.validators import Email, Length, EqualTo, InputRequired, Regexp
+
+from CustomResponse import CustomResponse
 from models import UserInfo, EmailCode
 from exts import db
 
 
-# Form:主要就是用来验证前端提交的数据格式是否符合要求
 class RegisterForm(wtforms.Form):
-    email = wtforms.StringField(validators=[Email(message="邮箱格式错误！")])
-    captcha = wtforms.StringField(validators=[Length(min=4, max=4, message="验证码格式错误！")])
-    username = wtforms.StringField(validators=[Length(min=3, max=20, message="用户名格式错误")])
-    password = wtforms.StringField(validators=[Length(min=4, max=20, message="密码格式错误！")])
-    password_confirm = wtforms.StringField(validators=[EqualTo("password", message="两次密码不一致！！")])
+    email = wtforms.StringField(validators=[Email(message="邮箱格式错误！"), Length(max=150, message="邮箱过长")])
+    emailCode = wtforms.StringField(validators=[Length(min=6, max=6, message="验证码格式错误！"), ])
+    nickName = wtforms.StringField(validators=[Length(min=3, max=20, message="用户名格式错误")])
+    password = wtforms.StringField(validators=[Length(min=8, max=18, message="密码格式错误！"),
+                                               Regexp('^(?![0-9a-zA-Z]+$)[a-zA-Z0-9~!@#$%^&*?_-]{1,50}$',
+                                                      message="密码格式错误")])
 
     # 自定义验证邮箱是否已经被注册
     def validate_email(self, field):
         email = field.data
         user = UserInfo.query.filter_by(email=email).first()
         if user:
-            raise wtforms.ValidationError(message="该邮箱已经被注册！")
+            return CustomResponse(info="邮箱已被注册").to_dict()
 
-    # 验证验证码是否正确
-    def validate_captcha(self, field):
-        captcha = field.data
-        email = self.email.data
-        captcha_model = EmailCode.query.filter_by(email=email, code=captcha).first()
-        if not captcha_model:
-            # 抛出异常提示
-            raise wtforms.ValidationError(message="邮箱或者验证码错误！")
-        # else:
-        #     # 验证完成后删除此验证码(也可定期删除)
-        #     db.session.delete(captcha_model)
-        #     db.session.commit()
+    #     验证昵称是否被注册
+    def validate_nickName(self, field):
+        nickName = field.data
+        user = UserInfo.query.filter_by(nick_name=nickName).first()
+        if user:
+            return CustomResponse(info="昵称已被注册").to_dict()
 
 
 class LoginForm(wtforms.Form):

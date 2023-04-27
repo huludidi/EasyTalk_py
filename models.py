@@ -16,7 +16,7 @@ class EmailCode(db.Model):
     __table_args__ = {'comment': '邮箱验证码'}
 
     email = db.Column(db.String(150), primary_key=True, nullable=False, comment='邮箱')
-    code = db.Column(db.String(5), primary_key=True, nullable=False, comment='编号')
+    code = db.Column(db.String(6), primary_key=True, nullable=False, comment='编号')
     create_time = db.Column(db.DateTime, comment='创建时间')
     status = db.Column(db.Boolean, comment='0:未使用  1:已使用')
 
@@ -138,7 +138,7 @@ class UserInfo(db.Model):
     user_id = db.Column(db.String(15), primary_key=True, comment='用户ID')
     nick_name = db.Column(db.String(20), unique=True, comment='昵称')
     email = db.Column(db.String(150), unique=True, comment='邮箱')
-    password = db.Column(db.String(50), comment='密码')
+    password = db.Column(db.String(150), comment='密码')
     sex = db.Column(db.Integer, comment='0:女 1:男')
     person_description = db.Column(db.String(200), comment='个人描述')
     join_time = db.Column(db.DateTime, comment='加入时间')
