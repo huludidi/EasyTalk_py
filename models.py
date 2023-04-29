@@ -86,6 +86,17 @@ class ForumBoard(db.Model):
     sort = db.Column(db.Integer, comment='排序')
     post_type = db.Column(db.Boolean, server_default=text('1'), comment='0:只允许管理员发帖 1:任何人可以发帖')
 
+    def to_dict(self):
+        return {
+            "board_id": self.board_id,
+            "p_board_id": self.p_board_id,
+            "board_name": self.board_name,
+            "cover": self.cover,
+            "board_desc": self.board_desc,
+            "sort": self.sort,
+            "post_type": self.post_type,
+        }
+
 
 class ForumComment(db.Model):
     __tablename__ = 'forum_comment'
@@ -173,7 +184,6 @@ class UserMessage(db.Model):
     article_id = db.Column(db.String(15), comment='文章ID')
     article_title = db.Column(db.String(150), comment='文章标题')
     comment_id = db.Column(db.Integer, comment='评论ID')
-    send_user_id = db.Column(db.String(15), comment='发送人用户ID')
     send_user_id = db.Column(db.String(15), comment='发送人用户ID')
     send_nick_name = db.Column(db.String(20), comment='发送人昵称')
     message_type = db.Column(db.Integer, index=True, comment='0:系统消息 1:评论 2:文章点赞  3:评论点赞 4:附件下载')

@@ -3,7 +3,7 @@ import datetime
 import wtforms
 
 from wtforms import Form
-from wtforms.validators import Email, Length, EqualTo, InputRequired, Regexp
+from wtforms.validators import Email, Length, InputRequired, Regexp, DataRequired
 
 from CustomResponse import CustomResponse
 from models import UserInfo, EmailCode
@@ -36,13 +36,12 @@ class RegisterForm(wtforms.Form):
 class LoginForm(wtforms.Form):
     email = wtforms.StringField(validators=[Email(message="邮箱格式错误！")])
     password = wtforms.StringField(validators=[Length(min=4, max=20, message="密码格式错误！")])
+    checkCode = wtforms.StringField(validators=[DataRequired(message="请输入验证码")])
 
-
-class QuestionForm(wtforms.Form):
-    title = wtforms.StringField(validators=[Length(min=3, max=100, message="标题格式错误")])
-    content = wtforms.StringField(validators=[Length(min=3, message="内容格式错误")])
-
-
-class AnswerForm(wtforms.Form):
-    content = wtforms.StringField(validators=[Length(min=3, message="内容格式错误")])
-    question_id = wtforms.IntegerField(validators=[InputRequired(message="必须要传入问题id")])
+class ResetPwdForm(wtforms.Form):
+    email = wtforms.StringField(validators=[Email(message="邮箱格式错误！"), Length(max=150, message="邮箱过长")])
+    emailCode = wtforms.StringField(validators=[Length(min=6, max=6, message="验证码格式错误！"), ])
+    checkCode = wtforms.StringField(validators=[DataRequired(message="请输入验证码")])
+    password = wtforms.StringField(validators=[Length(min=8, max=18, message="密码格式错误！"),
+                                               Regexp('^(?![0-9a-zA-Z]+$)[a-zA-Z0-9~!@#$%^&*?_-]{1,50}$',
+                                                      message="密码格式错误")])

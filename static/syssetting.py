@@ -1,6 +1,7 @@
 import json
 from flask import jsonify
-
+# 管理员账号
+ADMIN_EMAIL = ["2488687107@qq.com"]
 
 # 审核权限
 class Audit:

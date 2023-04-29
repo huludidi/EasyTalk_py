@@ -1,3 +1,18 @@
+from flask import jsonify
+
+
+def SuccessResponse(data=None):
+    code = 200
+    status = "success"
+    info = None
+    data = data
+    return jsonify({
+        'status': status,
+        'code': code,
+        'info': info,
+        'data': data
+    })
+
 
 class CustomResponse:
     def __init__(self, status=None, code=None, info=None, data=None):
@@ -26,13 +41,15 @@ class CustomResponse:
         if code == 901:
             self.status = "error"
             self.info = "登录超时，长时间未操作"
-
+        if code == 900:
+            self.status = "error"
+            self.info = "http请求超时"
         self.data = data
 
     def to_dict(self):
-        return {
+        return jsonify({
             'status': self.status,
             'code': self.code,
             'info': self.info,
             'data': self.data
-        }
+        })
