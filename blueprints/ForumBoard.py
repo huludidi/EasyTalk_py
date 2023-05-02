@@ -21,7 +21,6 @@ def convert_line_to_tree(data_list, pid):
 def loadBoard():
     formboardinfo = ForumBoard.query.filter_by(post_type=1).order_by('sort').all()
     formboardinfoList = []
-    # formboardinfoList = convert_line_to_tree(formboardinfo, 0)
     for item in formboardinfo:
         formboardinfoList.append(item.to_dict())
 

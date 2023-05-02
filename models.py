@@ -1,14 +1,13 @@
-# from sqlalchemy import BigInteger, Column, DateTime, Index, Integer, String, TIMESTAMP, Text, text
-# from sqlalchemy.dialects.mysql import TINYINT, VARCHAR
-# from sqlalchemy.ext.declarative import declarative_base
-#
-# Base = declarative_base()
-# metadata = Base.metadata
+import json
 from datetime import datetime
+from math import ceil
 
-from sqlalchemy import text
+from flask import abort, session
+from sqlalchemy import text, func
 
+from CustomResponse import CustomResponse
 from exts import db
+from static.enums import globalinfoEnum, MessageTypeEnum
 
 
 class EmailCode(db.Model):
@@ -30,9 +29,10 @@ class ForumArticle(db.Model):
     board_name = db.Column(db.String(50), comment='板块名称')
     p_board_id = db.Column(db.Integer, index=True, comment='父级板块ID')
     p_board_name = db.Column(db.String(50), comment='父板块名称')
-    user_id = db.Column(db.String(15), nullable=False, index=True, comment='用户ID')
+    author_id = db.Column(db.String(15), nullable=False, index=True, comment='用户ID')
     nick_name = db.Column(db.String(20), nullable=False, comment='昵称')
-    user_ip_address = db.Column(db.String(100), comment='最后登录ip地址')
+    author_ip_address = db.Column(db.String(100), comment='最后登录ip地址')
+    author_school = db.Column(db.String(100), comment='作者学校')
     title = db.Column(db.String(150), nullable=False, index=True, comment='标题')
     cover = db.Column(db.String(100), comment='封面')
     content = db.Column(db.Text, comment='内容')
@@ -48,6 +48,87 @@ class ForumArticle(db.Model):
     attachment_type = db.Column(db.Boolean, comment='0:没有附件  1:有附件')
     status = db.Column(db.Integer, comment='-1已删除 0:待审核  1:已审核 ')
 
+    __mapper_args__ = {
+        'exclude_properties': []
+    }
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+    def searchlist(self, userinfo=None, p_board_id=None, board_id=None, orderType=None, filterType=None, pageNo=None):
+        try:
+            ForumArticle.__mapper_args__['exclude_properties'] = ['markdown_content', 'content']
+            condition = {}
+            if p_board_id:
+                condition['p_board_id'] = p_board_id
+            if board_id:
+                condition['board_id'] = board_id
+            # 查询数据总数
+            total_count = db.session.query(func.count(ForumArticle.article_id)).filter_by(**condition).scalar()
+
+            # 查询数据
+            articles = db.session.query(ForumArticle).filter_by(**condition)
+            # 对内容进行排序
+            if orderType:
+                if orderType == '0':  # 点赞最多
+                    articles = articles.order_by(ForumArticle.good_count.desc())
+                elif orderType == '1':  # 评论最多
+                    articles = articles.order_by(ForumArticle.comment_count.desc())
+            else:
+                articles = articles.order_by(ForumArticle.post_time.desc())
+            # 对内容进行筛选
+            if userinfo and filterType:
+                if filterType == '0':
+                    if userinfo.get('school') == None:
+                        print("请用户绑定学校")
+                    else:
+                        articles = articles.filter(ForumArticle.author_school == userinfo.get('school'))
+                elif filterType == '1':
+                    if json.loads(userinfo.get('lastLoginIpAddress')).get('region') == '未知':
+                        print("无法获取用户位置信息")
+                    else:
+                        articles = articles.filter(ForumArticle.author_ip_address == userinfo.get('lastLoginIpAddress'))
+            # 计算分页参数
+            start_index = (int(pageNo) - 1) * globalinfoEnum.PageSize.value
+            end_index = start_index + globalinfoEnum.PageSize.value
+            # 设置分页信息
+            articles = articles.slice(start_index, end_index)
+
+            # 将内容转换为字典列表
+            result = {}
+            for article in articles:
+                result.append({
+                    'articleId': article.article_id,
+                    'boardId': article.board_id,
+                    'boardName': article.board_name,
+                    'pBoardId': article.p_board_id,
+                    'pBoardName': article.p_board_name,
+                    'authorId': article.author_id,
+                    'nickName': article.nick_name,
+                    'authorSchool': article.author_school,
+                    'authorIpAddress': article.author_ip_address,
+                    'title': article.title,
+                    'cover': article.cover,
+                    'summary': article.summary,
+                    'postTime': article.post_time,
+                    'lastUpdateTime': article.last_update_time,
+                    'readCount': article.read_count,
+                    'goodCount': article.good_count,
+                    'commentCount': article.comment_count,
+                    'topType': article.top_type,
+                    'status': article.status,
+                })
+            return {
+                'totalCount': total_count,
+                'pageNo': pageNo,
+                'pageSize': globalinfoEnum.PageSize.value,
+                'pageTotal': ceil(total_count / globalinfoEnum.PageSize.value),
+                'articleList': result
+            }
+        except Exception as e:
+            print(e)
+            raise 500
+
 
 class ForumArticleAttachment(db.Model):
     __tablename__ = 'forum_article_attachment'
@@ -62,6 +143,9 @@ class ForumArticleAttachment(db.Model):
     file_path = db.Column(db.String(100), comment='文件路径')
     file_type = db.Column(db.Integer, comment='文件类型')
     integral = db.Column(db.Integer, comment='下载所需积分')
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
 class ForumArticleAttachmentDownload(db.Model):
@@ -87,15 +171,7 @@ class ForumBoard(db.Model):
     post_type = db.Column(db.Boolean, server_default=text('1'), comment='0:只允许管理员发帖 1:任何人可以发帖')
 
     def to_dict(self):
-        return {
-            "board_id": self.board_id,
-            "p_board_id": self.p_board_id,
-            "board_name": self.board_name,
-            "cover": self.cover,
-            "board_desc": self.board_desc,
-            "sort": self.sort,
-            "post_type": self.post_type,
-        }
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
 class ForumComment(db.Model):
@@ -117,6 +193,8 @@ class ForumComment(db.Model):
     good_count = db.Column(db.Integer, server_default=text('0'), comment='good数量')
     status = db.Column(db.Boolean, index=True, comment='0:待审核  1:已审核')
 
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class LikeRecord(db.Model):
     __tablename__ = 'like_record'
@@ -133,6 +211,56 @@ class LikeRecord(db.Model):
     create_time = db.Column(db.DateTime, comment='发布时间')
     author_user_id = db.Column(db.String(15), comment='主体作者ID')
 
+    # def dolike(self,articleid,optype,userid):
+    #     try:
+    #         usermessage = UserMessage()
+    #         # 文章点赞
+    #         if int(optype) == globalinfoEnum.ARTICLE_LIKE.value:
+    #             article = ForumArticle.query.filter_by(article_id=articleid).first()
+    #             if not article:
+    #                 abort(500, description="文章不存在")
+    #             # likecord = articleLike(articleid, article, userid, optype)
+    #             likecord = LikeRecord.query.filter_by(object_id=articleid, user_id=userid, op_type=optype).first()
+    #             try:
+    #                 if not likecord:
+    #                     new_likecord = LikeRecord(op_type=optype, object_id=articleid, user_id=userid,
+    #                                               create_time=datetime.now(),
+    #                                               author_user_id=article.author_id)
+    #                     article.good_count += 1
+    #                     db.session.add(new_likecord)
+    #                     db.session.commit()
+    #                 else:
+    #                     db.session.delete(likecord)
+    #                     article.good_count -= 1
+    #                     db.session.commit()
+    #             except Exception as e:
+    #                 db.session.rollback()
+    #                 print(e)
+    #                 abort(422)
+    #             usermessage.article_id = articleid
+    #             usermessage.comment_id = 0
+    #             usermessage.article_title = article.title
+    #             usermessage.message_type = MessageTypeEnum.ARTICLE_LIKE.value.get('type')
+    #             usermessage.received_user_id = article.author_id
+    #         #     评论点赞
+    #         else:
+    #             return
+    #         usermessage.create_time = datetime.now()
+    #         usermessage.send_user_id = userid
+    #         usermessage.send_nick_name = session['userInfo'].get('nickName')
+    #         usermessage.status = 1
+    #         if not likecord and userid != usermessage.received_user_id:
+    #             messageinfo = UserMessage.query.filter_by(article_id=usermessage.article_id,
+    #                                                       comment_id=usermessage.comment_id,
+    #                                                       send_user_id=usermessage.send_user_id,
+    #                                                       message_type=usermessage.message_type).first()
+    #             if not messageinfo:
+    #                 db.session.add(usermessage)
+    #                 db.session.commit()
+    #     except Exception as e:
+    #         print(e)
+    #         db.session.rollback()
+    #         abort(422)
 
 class SysSetting(db.Model):
     __tablename__ = 'sys_setting'
@@ -188,5 +316,5 @@ class UserMessage(db.Model):
     send_nick_name = db.Column(db.String(20), comment='发送人昵称')
     message_type = db.Column(db.Integer, index=True, comment='0:系统消息 1:评论 2:文章点赞  3:评论点赞 4:附件下载')
     message_content = db.Column(db.String(1000), comment='消息内容')
-    status = db.Column(db.Integer, index=True, comment='1:未读 2:已读')
+    status = db.Column(db.Integer, index=True, server_default=text('1'), comment='1:未读 2:已读')
     create_time = db.Column(db.DateTime, comment='创建时间')

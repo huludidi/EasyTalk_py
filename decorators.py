@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import g, redirect, url_for, request
+from flask import g, request, session, abort
 
 from CustomResponse import CustomResponse
 
@@ -9,10 +9,10 @@ def login_required(func):
     @wraps(func)
     #     万能参数
     def inner(*args, **kwargs):
-        if g.user:
+        if session.get('userInfo'):
             return func(*args, **kwargs)
         else:
-            return redirect(url_for("user.login"))
+            abort(500, description="请先登录")
 
     return inner
 

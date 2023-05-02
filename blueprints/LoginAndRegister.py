@@ -4,7 +4,7 @@ import random
 import string
 import requests
 
-from flask import Blueprint, request, send_file, jsonify, make_response, session, g
+from flask import Blueprint, request, send_file, jsonify, make_response, session, g, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 from captcha.image import ImageCaptcha
 from flask_mail import Message
@@ -49,7 +49,7 @@ def sendEmailCode():
         # 检查是否已经存在此邮箱
         user = UserInfo.query.filter_by(email=email).first()
         if user:
-            return CustomResponse(info="邮箱已经被注册").to_dict()
+            abort(400, description="该邮箱已经被注册")
     # 生成验证码
     source = string.digits * 6
     captcha = random.sample(source, 6)
@@ -65,7 +65,7 @@ def sendEmailCode():
         # 发送邮箱验证码
         message = Message(subject="验证码", recipients=[email], body=f"您的验证码是：{captcha}")
         mail.send(message)
-        return "Sent successfully"
+        return CustomResponse(code=200).to_dict()
     except Exception as e:
         print("send error" + str(e))
         return "send error" + str(e)
@@ -83,9 +83,9 @@ def register():
         # # 检查邮箱验证码
         dbInfo = EmailCode.query.get((email, emailCode))
         if dbInfo is None:
-            return CustomResponse(info="邮箱验证码不正确").to_dict()
+            abort(400, description="邮箱验证码不正确")
         if dbInfo.status != 0 or (datetime.now() - dbInfo.create_time).seconds > 900:
-            return CustomResponse(info="邮箱验证码已经失效").to_dict()
+            abort(400, description="该邮箱验证码已失效")
         dbInfo.status = 1
         db.session.commit()
         # #  生成用户账号,写入数据库
@@ -106,7 +106,7 @@ def register():
         return CustomResponse(code=200).to_dict()
     else:
         print(form.errors.values())
-        return CustomResponse(code=600).to_dict()
+        abort(400)
 
 
 @bp.route("/login", methods=['POST'])
@@ -120,15 +120,15 @@ def login():
         # 检查账号
         userinfo = UserInfo.query.filter_by(email=email).first()
         if userinfo is None or not check_password_hash(userinfo.password, password):
-            return CustomResponse(info="账号或密码错误").to_dict()
+            abort(400, description="账户或密码错误")
         if userinfo.status == 0:
-            return CustomResponse(info="账号已被禁用").to_dict()
+            abort(400, description="账号已被禁用")
         # 检查验证码
         sessionCheckcode = session.get('checkCode')
         if not sessionCheckcode:
-            return CustomResponse(info="验证码已过期").to_dict()
+            abort(400, description="该邮箱已经被注册")
         if checkCode.lower() != sessionCheckcode.lower():
-            return CustomResponse(info="验证码错误").to_dict()
+            abort(400, description="验证码错误")
         # 获取登录ip以及地址
         try:
             # user_ip = request.remote_addr
@@ -152,8 +152,9 @@ def login():
             db.session.commit()
             # 保存在session中
             session_userInfo = {
+                'school': userinfo.school,
                 'nickName': userinfo.nick_name,
-                'ipAddress': userinfo.last_login_ip_address,
+                'lastLoginIpAddress': userinfo.last_login_ip_address,
                 'userId': userinfo.user_id
             }
             if userinfo.email in ADMIN_EMAIL:
@@ -164,7 +165,7 @@ def login():
             return CustomResponse(code=200).to_dict()
     else:
         print(form.errors)
-        return CustomResponse(code=600).to_dict()
+        abort(400)
 
 
 @bp.route("/getUserInfo", methods=['POST'])
@@ -181,9 +182,11 @@ def logout():
     session.clear()
     return CustomResponse(code=200).to_dict()
 
+
 @bp.route("/getSysSetting", methods=['POST'])
 def getsyssetting():
     return CustomResponse(code=200, data=g.commentInfo.to_dict()).to_dict()
+
 
 @bp.route("/resetPwd", methods=['POST'])
 def resetpassword():
@@ -197,24 +200,25 @@ def resetpassword():
             # 验证验证码是否正确
             sessionCheckcode = session.get('checkCode')
             if checkCode.lower() != sessionCheckcode.lower():
-                return CustomResponse(info="验证码错误").to_dict()
+                abort(400, description="验证码错误")
             user = UserInfo.query.filter_by(email=email).first()
             if not user:
-                return CustomResponse(info="邮箱不存在").to_dict()
+                abort(400, description="邮箱不存在")
             #  检查邮箱验证码
             dbInfo = EmailCode.query.get((email, emailCode))
             if dbInfo is None:
-                return CustomResponse(info="邮箱验证码不正确").to_dict()
+                abort(400, description="邮箱验证码不正确")
             if dbInfo.status != 0 or (datetime.now() - dbInfo.create_time).seconds > 900:
-                return CustomResponse(info="邮箱验证码已经失效").to_dict()
+                abort(400, description="邮箱验证码已失效")
             dbInfo.status = 1
             db.session.commit()
             # 更新密码
-            user.password=generate_password_hash(password)
+            user.password = generate_password_hash(password)
             db.session.commit()
         finally:
             session.pop('checkCode')
             return CustomResponse(code=200).to_dict()
     else:
         print(form.errors)
-        return CustomResponse(code=400).to_dict()
+        abort(400)
+
