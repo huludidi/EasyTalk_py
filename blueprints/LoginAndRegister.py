@@ -15,7 +15,7 @@ from blueprints.forms import RegisterForm, LoginForm, ResetPwdForm
 from decorators import check_params
 from exts import db, mail
 from models import UserInfo, EmailCode, UserMessage
-from CustomResponse import CustomResponse
+from functions import CustomResponse
 from static.enums import MessageTypeEnum
 from static.syssetting import ADMIN_EMAIL
 

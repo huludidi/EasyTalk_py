@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 from flask import Blueprint, request, jsonify, session, abort, make_response, send_file
-from CustomResponse import CustomResponse, SuccessResponse
+from functions import CustomResponse, SuccessResponse
 from decorators import check_params, login_required
 from exts import db
 from models import ForumBoard, ForumArticle, ForumArticleAttachment, LikeRecord, UserMessage
@@ -13,11 +13,11 @@ bp = Blueprint("ForumArticle", __name__, url_prefix="/forum")
 
 @bp.route("/loadArticle", methods=['POST'])
 def loadArticle():
-    boardId = request.form.get('boardId')
-    pBoardId = request.form.get('pBoardId')
-    orderType = request.form.get('orderType')  # 0:点赞最多 1:评论最多
-    filterType = request.form.get('filterType')  # 0:与我同校 1:与我同城
-    pageNo = request.form.get('pageNo')
+    boardId = request.values.get('boardId')
+    pBoardId = request.values.get('pBoardId')
+    orderType = request.values.get('orderType')  # 0:点赞最多 1:评论最多
+    filterType = request.values.get('filterType')  # 0:与我同校 1:与我同城
+    pageNo = request.values.get('pageNo')
     userinfo = session.get('userInfo')
     forumarticle = ForumArticle()
     data = forumarticle.searchlist(userinfo=userinfo, p_board_id=pBoardId, board_id=boardId, orderType=orderType,
@@ -29,7 +29,7 @@ def loadArticle():
 @check_params
 def getArticleDetail():
     try:
-        articleid = request.form.get('articleId')
+        articleid = request.values.get('articleId')
         article = ForumArticle.query.filter_by(article_id=articleid).first()
         # 判断是否可以访问
         if not article or (article.status != 1 and (
@@ -53,7 +53,7 @@ def getArticleDetail():
             if likerecord:
                 result['haveLike'] = True
         db.session.commit()
-        return CustomResponse(code=200, data=result).to_dict()
+        return SuccessResponse(data=result)
     except:
         db.session.rollback()
         abort(422)
@@ -63,44 +63,12 @@ def getArticleDetail():
 @login_required
 @check_params
 def doLike():
-    articleid = request.form.get('articleId')
-    optype = request.form.get('opType')
+    articleid = request.values.get('articleId')
+    optype = request.values.get('opType')
     userid = session['userInfo'].get('userId')
-    # LikeRecord.dolike(articleid,optype,userid)
-    try:
-        usermessage = UserMessage()
-        # 文章点赞
-        if int(optype) == globalinfoEnum.ARTICLE_LIKE.value:
-            article = ForumArticle.query.filter_by(article_id=articleid).first()
-            if not article:
-                abort(500, description="文章不存在")
-            likecord = articleLike(articleid, article, userid, optype)
-            usermessage.article_id = articleid
-            usermessage.comment_id = 0
-            usermessage.article_title = article.title
-            usermessage.message_type = MessageTypeEnum.ARTICLE_LIKE.value.get('type')
-            usermessage.received_user_id = article.author_id
-        #     评论点赞
-        else:
-            return
-        usermessage.create_time = datetime.now()
-        usermessage.send_user_id = userid
-        usermessage.send_nick_name = session['userInfo'].get('nickName')
-        usermessage.status = 1
-        if not likecord and userid != usermessage.received_user_id:
-            messageinfo = UserMessage.query.filter_by(article_id=usermessage.article_id,
-                                                      comment_id=usermessage.comment_id,
-                                                      send_user_id=usermessage.send_user_id,
-                                                      message_type=usermessage.message_type).first()
-            if not messageinfo:
-                db.session.add(usermessage)
-                db.session.commit()
-    except Exception as e:
-        print(e)
-        db.session.rollback()
-        abort(422)
-    finally:
-        return CustomResponse(code=200).to_dict()
+    likerecord = LikeRecord()
+    likerecord.dolike(objectid=articleid,optype=optype,userid=userid)
+    return SuccessResponse()
 
 
 def articleLike(objid, article, userid, optype):
@@ -123,11 +91,11 @@ def articleLike(objid, article, userid, optype):
         abort(422)
 
 
-@bp.route("/attachmentDownload", methods=[ 'POST'])
+@bp.route("/attachmentDownload", methods=['POST'])
 @login_required
 @check_params
 def attachmentDownload():
-    fileid = request.form.get('fileId')
+    fileid = request.values.get('fileId')
     # fileid = request.args.get('fileId')
     file = ForumArticleAttachment.query.filter_by(file_id=fileid).first()
     if file is None:

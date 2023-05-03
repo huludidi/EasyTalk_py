@@ -1,7 +1,7 @@
 import json
 
 from flask import Blueprint, request, jsonify, session
-from CustomResponse import CustomResponse, SuccessResponse
+from functions import CustomResponse, SuccessResponse
 from models import ForumBoard
 
 

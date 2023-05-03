@@ -5,7 +5,7 @@ import wtforms
 from wtforms import Form
 from wtforms.validators import Email, Length, InputRequired, Regexp, DataRequired
 
-from CustomResponse import CustomResponse
+from functions import CustomResponse
 from models import UserInfo, EmailCode
 from exts import db
 

@@ -5,7 +5,7 @@ from math import ceil
 from flask import abort, session
 from sqlalchemy import text, func
 
-from CustomResponse import CustomResponse
+from functions import CustomResponse
 from exts import db
 from static.enums import globalinfoEnum, MessageTypeEnum
 
@@ -56,20 +56,18 @@ class ForumArticle(db.Model):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
     def searchlist(self, userinfo=None, p_board_id=None, board_id=None, orderType=None, filterType=None, pageNo=None):
-        try:
+        # try:
             ForumArticle.__mapper_args__['exclude_properties'] = ['markdown_content', 'content']
             condition = {}
             if p_board_id:
                 condition['p_board_id'] = p_board_id
             if board_id:
                 condition['board_id'] = board_id
-            # 查询数据总数
-            total_count = db.session.query(func.count(ForumArticle.article_id)).filter_by(**condition).scalar()
 
             # 查询数据
             articles = db.session.query(ForumArticle).filter_by(**condition)
             # 对内容进行排序
-            if orderType:
+            if orderType :
                 if orderType == '0':  # 点赞最多
                     articles = articles.order_by(ForumArticle.good_count.desc())
                 elif orderType == '1':  # 评论最多
@@ -80,14 +78,16 @@ class ForumArticle(db.Model):
             if userinfo and filterType:
                 if filterType == '0':
                     if userinfo.get('school') == None:
-                        print("请用户绑定学校")
+                        abort(400,description="请用户绑定学校")
                     else:
                         articles = articles.filter(ForumArticle.author_school == userinfo.get('school'))
                 elif filterType == '1':
                     if json.loads(userinfo.get('lastLoginIpAddress')).get('region') == '未知':
-                        print("无法获取用户位置信息")
+                        abort(400,description="无法定位用户位置")
                     else:
                         articles = articles.filter(ForumArticle.author_ip_address == userinfo.get('lastLoginIpAddress'))
+            # 查询数据总数
+            total_count=articles.count()
             # 计算分页参数
             start_index = (int(pageNo) - 1) * globalinfoEnum.PageSize.value
             end_index = start_index + globalinfoEnum.PageSize.value
@@ -95,7 +95,7 @@ class ForumArticle(db.Model):
             articles = articles.slice(start_index, end_index)
 
             # 将内容转换为字典列表
-            result = {}
+            result = []
             for article in articles:
                 result.append({
                     'articleId': article.article_id,
@@ -123,11 +123,11 @@ class ForumArticle(db.Model):
                 'pageNo': pageNo,
                 'pageSize': globalinfoEnum.PageSize.value,
                 'pageTotal': ceil(total_count / globalinfoEnum.PageSize.value),
-                'articleList': result
+                'list': result
             }
-        except Exception as e:
-            print(e)
-            raise 500
+        # except Exception as e:
+        #     print(e)
+        #     abort(422)
 
 
 class ForumArticleAttachment(db.Model):
@@ -191,7 +191,8 @@ class ForumComment(db.Model):
     top_type = db.Column(db.Boolean, index=True, server_default=text('0'), comment='0:未置顶  1:置顶')
     post_time = db.Column(db.DateTime, index=True, comment='发布时间')
     good_count = db.Column(db.Integer, server_default=text('0'), comment='good数量')
-    status = db.Column(db.Boolean, index=True, comment='0:待审核  1:已审核')
+    status = db.Column(db.Boolean,server_default=text('0'), index=True, comment='0:待审核  1:已审核')
+    audit = db.Column(db.Boolean, index=True, comment='0:审核通过  1:审核未通过')
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -211,56 +212,80 @@ class LikeRecord(db.Model):
     create_time = db.Column(db.DateTime, comment='发布时间')
     author_user_id = db.Column(db.String(15), comment='主体作者ID')
 
-    # def dolike(self,articleid,optype,userid):
-    #     try:
-    #         usermessage = UserMessage()
-    #         # 文章点赞
-    #         if int(optype) == globalinfoEnum.ARTICLE_LIKE.value:
-    #             article = ForumArticle.query.filter_by(article_id=articleid).first()
-    #             if not article:
-    #                 abort(500, description="文章不存在")
-    #             # likecord = articleLike(articleid, article, userid, optype)
-    #             likecord = LikeRecord.query.filter_by(object_id=articleid, user_id=userid, op_type=optype).first()
-    #             try:
-    #                 if not likecord:
-    #                     new_likecord = LikeRecord(op_type=optype, object_id=articleid, user_id=userid,
-    #                                               create_time=datetime.now(),
-    #                                               author_user_id=article.author_id)
-    #                     article.good_count += 1
-    #                     db.session.add(new_likecord)
-    #                     db.session.commit()
-    #                 else:
-    #                     db.session.delete(likecord)
-    #                     article.good_count -= 1
-    #                     db.session.commit()
-    #             except Exception as e:
-    #                 db.session.rollback()
-    #                 print(e)
-    #                 abort(422)
-    #             usermessage.article_id = articleid
-    #             usermessage.comment_id = 0
-    #             usermessage.article_title = article.title
-    #             usermessage.message_type = MessageTypeEnum.ARTICLE_LIKE.value.get('type')
-    #             usermessage.received_user_id = article.author_id
-    #         #     评论点赞
-    #         else:
-    #             return
-    #         usermessage.create_time = datetime.now()
-    #         usermessage.send_user_id = userid
-    #         usermessage.send_nick_name = session['userInfo'].get('nickName')
-    #         usermessage.status = 1
-    #         if not likecord and userid != usermessage.received_user_id:
-    #             messageinfo = UserMessage.query.filter_by(article_id=usermessage.article_id,
-    #                                                       comment_id=usermessage.comment_id,
-    #                                                       send_user_id=usermessage.send_user_id,
-    #                                                       message_type=usermessage.message_type).first()
-    #             if not messageinfo:
-    #                 db.session.add(usermessage)
-    #                 db.session.commit()
-    #     except Exception as e:
-    #         print(e)
-    #         db.session.rollback()
-    #         abort(422)
+    def dolike(self,objectid,optype,userid):
+        try:
+            usermessage = UserMessage()
+            # 文章点赞
+            if int(optype) == globalinfoEnum.ARTICLE_LIKE.value:
+                article = ForumArticle.query.filter_by(article_id=objectid).first()
+                if not article:
+                    abort(500, description="文章不存在")
+                # likecord = articleLike(articleid, article, userid, optype)
+                likecord = LikeRecord.query.filter_by(object_id=objectid, user_id=userid, op_type=optype).first()
+                try:
+                    if not likecord:
+                        new_likecord = LikeRecord(op_type=optype, object_id=objectid, user_id=userid,
+                                                  create_time=datetime.now(),
+                                                  author_user_id=article.author_id)
+                        article.good_count += 1
+                        db.session.add(new_likecord)
+                        db.session.commit()
+                    else:
+                        db.session.delete(likecord)
+                        article.good_count -= 1
+                        db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    print(e)
+                    abort(422)
+                usermessage.article_id = objectid
+                usermessage.comment_id = 0
+                usermessage.article_title = article.title
+                usermessage.message_type = MessageTypeEnum.ARTICLE_LIKE.value.get('type')
+                usermessage.received_user_id = article.author_id
+            #     评论点赞
+            else:
+                comment = ForumComment.query.filter_by(comment_id=objectid).first()
+                if not comment:
+                    abort(500, description="评论不存在")
+                likecord = LikeRecord.query.filter_by(object_id=objectid, user_id=userid, op_type=optype).first()
+                try:
+                    if not likecord:
+                        new_likecord = LikeRecord(op_type=optype, object_id=objectid, user_id=userid,
+                                                  create_time=datetime.now(),
+                                                  author_user_id=comment.user_id)
+                        comment.good_count += 1
+                        db.session.add(new_likecord)
+                        db.session.commit()
+                    else:
+                        db.session.delete(likecord)
+                        comment.good_count -= 1
+                        db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    print(e)
+                    abort(422)
+                usermessage.article_id = 0
+                usermessage.comment_id = comment.comment_id
+                usermessage.article_title = 0
+                usermessage.message_type = MessageTypeEnum.COMMENT_LIKE.value.get('type')
+                usermessage.received_user_id = comment.user_id
+            usermessage.create_time = datetime.now()
+            usermessage.send_user_id = userid
+            usermessage.send_nick_name = session['userInfo'].get('nickName')
+            usermessage.status = 1
+            if not likecord and userid != usermessage.received_user_id:
+                messageinfo = UserMessage.query.filter_by(article_id=usermessage.article_id,
+                                                          comment_id=usermessage.comment_id,
+                                                          send_user_id=usermessage.send_user_id,
+                                                          message_type=usermessage.message_type).first()
+                if not messageinfo:
+                    db.session.add(usermessage)
+                    db.session.commit()
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+            abort(422)
 
 class SysSetting(db.Model):
     __tablename__ = 'sys_setting'

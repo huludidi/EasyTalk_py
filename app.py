@@ -10,6 +10,8 @@ from blueprints.LoginAndRegister import bp as lar_bp
 from blueprints.ForumBoard import bp as fb_bp
 from blueprints.ForumArticle import bp as fa_bp
 from blueprints.ForumComment import bp as fc_bp
+from blueprints.File import bp as f_bp
+
 
 from flask_migrate import Migrate
 from static.syssetting import Audit, Comment, Email, Like, Post, Register
@@ -18,8 +20,10 @@ app = Flask(__name__)
 # 绑定配置文件
 app.config.from_object(config)
 app.register_blueprint(lar_bp)
+app.register_blueprint(fa_bp)
 app.register_blueprint(fb_bp)
 app.register_blueprint(fc_bp)
+app.register_blueprint(f_bp)
 
 db.init_app(app)
 migrate = Migrate(app, db)

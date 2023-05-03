@@ -1,7 +1,7 @@
 from functools import wraps
 from flask import g, request, session, abort
 
-from CustomResponse import CustomResponse
+from functions import CustomResponse
 
 
 def login_required(func):
