@@ -11,10 +11,12 @@ from blueprints.ForumBoard import bp as fb_bp
 from blueprints.ForumArticle import bp as fa_bp
 from blueprints.ForumComment import bp as fc_bp
 from blueprints.File import bp as f_bp
+from blueprints.Ucenter import bp as uc_bp
+
 
 
 from flask_migrate import Migrate
-from static.syssetting import Audit, Comment, Email, Like, Post, Register
+from static.globalDto import Audit, Comment, Email, Like, Post, Register
 
 app = Flask(__name__)
 # 绑定配置文件
@@ -24,6 +26,7 @@ app.register_blueprint(fa_bp)
 app.register_blueprint(fb_bp)
 app.register_blueprint(fc_bp)
 app.register_blueprint(f_bp)
+app.register_blueprint(uc_bp)
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -44,7 +47,16 @@ def my_before_request():
     comment = Comment(comment_dict.get("commentDayCountThreshold"), comment_dict.get("commentIntegral"),
                       comment_dict.get("commentOpen"))
     setattr(g, "commentInfo", comment)
-
+    # 审核
+    syssetting = SysSetting.query.filter_by(code="audit").first()
+    audit_dict = json.loads(syssetting.json_content)
+    audit = Audit(audit_dict.get("commentAudit"), audit_dict.get("postAudit"))
+    setattr(g, "auditInfo", audit)
+    # 附件
+    syssetting = SysSetting.query.filter_by(code="post").first()
+    post_dict = json.loads(syssetting.json_content)
+    post = Post(post_dict.get("attachmentSize"), post_dict.get("dayImageUploadCount"),post_dict.get("postDayCountThreshold"))
+    setattr(g, "postInfo", post)
 
 @app.errorhandler(500)
 def code_500_error(error):

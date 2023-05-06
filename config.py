@@ -20,9 +20,11 @@ MAIL_PASSWORD = "bpsgwtwvwnxriahi"
 MAIL_DEFAULT_SENDER = "1398471354@qq.com"
 
 # ziefppvnudayfhda
+FILE_PATH="E:/stdio/毕设/file"
 # 上传图片地址
 IMAGE_PATH="E:/stdio/毕设/file/picture"
-IMAGE_FOLDER="/temp"
+PICTURE_FOLDER="/picture"
+TEMP_FOLDER="/temp"
 AVATAR_FOLDER="/avatar"
 # 上传附件地址
-FILE_PATH="E:/stdio/毕设/file/attachment"
+ATTACHMENT_FOLDER="/attachment"

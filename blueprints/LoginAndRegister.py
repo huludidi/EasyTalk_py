@@ -17,7 +17,7 @@ from exts import db, mail
 from models import UserInfo, EmailCode, UserMessage
 from functions import CustomResponse
 from static.enums import MessageTypeEnum
-from static.syssetting import ADMIN_EMAIL
+from static.globalDto import ADMIN_EMAIL
 
 bp = Blueprint("LoginAndRegister", __name__, url_prefix="/")
 

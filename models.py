@@ -47,6 +47,7 @@ class ForumArticle(db.Model):
     top_type = db.Column(db.Boolean, index=True, server_default=text('0'), comment='0未置顶  1:已置顶')
     attachment_type = db.Column(db.Boolean, comment='0:没有附件  1:有附件')
     status = db.Column(db.Integer, comment='-1已删除 0:待审核  1:已审核 ')
+    audit = db.Column(db.Boolean, comment='0:未通过  1:已通过')
 
     __mapper_args__ = {
         'exclude_properties': []
@@ -110,13 +111,14 @@ class ForumArticle(db.Model):
                     'title': article.title,
                     'cover': article.cover,
                     'summary': article.summary,
-                    'postTime': article.post_time,
-                    'lastUpdateTime': article.last_update_time,
+                    'postTime': article.post_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'lastUpdateTime': article.last_update_time.strftime('%Y-%m-%d %H:%M:%S'),
                     'readCount': article.read_count,
                     'goodCount': article.good_count,
                     'commentCount': article.comment_count,
                     'topType': article.top_type,
                     'status': article.status,
+                    'audit':article.audit
                 })
             return {
                 'totalCount': total_count,

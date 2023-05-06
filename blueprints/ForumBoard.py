@@ -1,20 +1,17 @@
-import json
-
-from flask import Blueprint, request, jsonify, session
-from functions import CustomResponse, SuccessResponse
+from flask import Blueprint
+from functions import SuccessResponse, convert_line_to_tree
 from models import ForumBoard
 
 
 bp = Blueprint("ForumBoard", __name__, url_prefix="/board")
 
-
-def convert_line_to_tree(data_list, pid):
-    children = []
-    for m in data_list:
-        if m["p_board_id"] == pid:
-            m["children"] = convert_line_to_tree(data_list, m["board_id"])
-            children.append(m)
-    return children
+# def convert_line_to_tree(data_list, pid):
+#     children = []
+#     for m in data_list:
+#         if m["p_board_id"] == pid:
+#             m["children"] = convert_line_to_tree(data_list, m["board_id"])
+#             children.append(m)
+#     return children
 
 
 @bp.route("/loadBoard", methods=['POST'])

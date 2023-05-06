@@ -1,7 +1,9 @@
 import json
 from flask import jsonify
+
 # 管理员账号
 ADMIN_EMAIL = ["2488687107@qq.com"]
+
 
 # 审核权限
 class Audit:
@@ -177,3 +179,29 @@ class Register:
 
     def setlregisterWelcomInfo(self, registerWelcomInfo):
         self.registerWelcomInfo = registerWelcomInfo
+
+
+# 文件上传
+class FileUpload:
+    def __init__(self, localPath=None, originalFileName=None):
+        self.localPath = localPath
+        self.originalFileName = originalFileName
+
+    def to_dict(self):
+        return {
+            'localPath': self.localPath,
+            'originalFileName': self.originalFileName,
+
+        }
+
+    def getlocalPath(self):
+        return self.localPath
+
+    def setlocalPath(self, localPath):
+        self.localPath = localPath
+
+    def getoriginalFileName(self):
+        return self.originalFileName
+
+    def setoriginalFileName(self, originalFileName):
+        self.originalFileName = originalFileName

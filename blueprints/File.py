@@ -1,13 +1,10 @@
 import os
-import random
-import string
-from datetime import datetime, timedelta
-from math import ceil
 
-from flask import Blueprint, request, session, abort, make_response, send_file, g
+from flask import Blueprint, request, abort, make_response, send_file
 
-from functions import CustomResponse, SuccessResponse
+from functions import SuccessResponse, generate_random_string
 import config
+from static.enums import globalinfoEnum
 
 bp = Blueprint("File", __name__, url_prefix="/file")
 
@@ -21,22 +18,16 @@ def uploadImage():
     filename = generate_random_string(15) + '.' + file.filename.rsplit('.', 1)[1].lower()
     if not allowed_file(filename):
         abort(400, description="文件格式不允许")
-    file.save(config.IMAGE_PATH + config.IMAGE_FOLDER + '/' + filename)
+    file.save(config.IMAGE_PATH + config.TEMP_FOLDER + '/' + filename)
     result = {
-        'filename': config.IMAGE_FOLDER + "/" + filename
+        'filename': config.TEMP_FOLDER + "/" + filename
     }
     return SuccessResponse(data=result)
 
 
 def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
     return '.' in filename and \
-        filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
-
-
-def generate_random_string(length):
-    letters = string.ascii_lowercase + string.ascii_uppercase + string.digits
-    return ''.join(random.choice(letters) for i in range(length))
+        filename.rsplit('.', 1)[1] in globalinfoEnum.IMAGE_SUFFIX.value
 
 
 @bp.route("/getImage/<imageFolder>/<imageName>", methods=['GET', 'POST'])

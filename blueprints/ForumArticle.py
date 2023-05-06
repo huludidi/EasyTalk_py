@@ -1,14 +1,70 @@
+import html
 import json
-from datetime import datetime
+import os
 
-from flask import Blueprint, request, jsonify, session, abort, make_response, send_file
-from functions import CustomResponse, SuccessResponse
+from PIL import Image
+
+import config
+
+from datetime import datetime
+from flask import Blueprint, request, session, abort, make_response, send_file, g
+from functions import SuccessResponse, convert_line_to_tree, generate_random_string, \
+    uploadFile2Local, generate_random_number, getImageList
 from decorators import check_params, login_required
 from exts import db
 from models import ForumBoard, ForumArticle, ForumArticleAttachment, LikeRecord, UserMessage
-from static.enums import globalinfoEnum, MessageTypeEnum
+from static.enums import globalinfoEnum, MessageTypeEnum, FileUploadTypeEnum, AttachmentTypeEnum
 
 bp = Blueprint("ForumArticle", __name__, url_prefix="/forum")
+
+
+# 板块校验
+def resetBoardInfo(isAdmin, article):
+    pboard = ForumBoard.query.filter_by(board_id=article.p_board_id).first()
+    if not pboard or (pboard.post_type == 0 and not isAdmin):
+        abort(400, description="一级板块不存在")
+    article.p_board_name = pboard.board_name
+    if article.board_id and article.board_id != 0:
+        board = ForumBoard.query.filter_by(board_id=article.board_id).first()
+        if not board or (board.post_type == 0 and not isAdmin):
+            abort(400, description="二级板块不存在")
+        article.board_name = board.board_name
+    else:
+        article.board_id = 0
+        article.board_name = None
+
+
+# 附件上传
+def uploadAttachment(article, forumattachment, file, isupload):
+    allowsizeMb = g.postInfo.getattachmentSize()
+    allowsize = allowsizeMb * 1024 * 1024
+    filesize = len(file.read())
+    if filesize > allowsize:
+        abort(400,description="附件最大只能上传" + str(allowsizeMb) + "MB")
+
+    # 修改
+    new_attachment = None
+    if isupload:
+        attachment = ForumArticleAttachment.query.filter_by(article_id=article.article_id).first()
+        # 若修改了附件，先删除原文件
+        if attachment:
+            new_attachment = attachment
+            os.remove(config.FILE_PATH + '/' + config.ATTACHMENT_FOLDER + '/' + attachment.file_path)
+
+    fileuploadDto = uploadFile2Local(file, config.ATTACHMENT_FOLDER, FileUploadTypeEnum.ARTICLE_ATTACHMENT)
+    if not new_attachment:
+        forumattachment.file_id = generate_random_number(15)
+        forumattachment.article_id = article.article_id
+        forumattachment.file_name = fileuploadDto.getoriginalFileName()
+        forumattachment.file_path = fileuploadDto.getlocalPath()
+        forumattachment.file_size = filesize
+        forumattachment.download_count = 0
+        forumattachment.file_type = AttachmentTypeEnum.ZIP.value.get('type')
+        db.session.add(forumattachment)
+    else:
+        attachment.file_name = fileuploadDto.getoriginalFileName()
+        attachment.file_size = filesize
+        attachment.file_path = fileuploadDto.getlocalPath()
 
 
 @bp.route("/loadArticle", methods=['POST'])
@@ -28,35 +84,33 @@ def loadArticle():
 @bp.route("/getArticleDetail", methods=['POST'])
 @check_params
 def getArticleDetail():
-    try:
-        articleid = request.values.get('articleId')
-        article = ForumArticle.query.filter_by(article_id=articleid).first()
-        # 判断是否可以访问
-        if not article or (article.status != 1 and (
-                session.get('userInfo') is None or json.loads(session['userInfo']).get(
-            'userId') != article.author_id or not
-                session['isAdmin'])):
-            abort(404)
-        # 打包返回结果
-        article.read_count += 1
-        result = {}
-        result['forumArticle'] = article.to_dict()
-        # 有附件
-        if article.attachment_type:
-            attachment = ForumArticleAttachment.query.filter_by(article_id=article.article_id).first()
-            result['attachment'] = attachment.to_dict()
-        # 是否已点赞
-        if session.get('userInfo'):
-            likerecord = LikeRecord.query.filter_by(
-                object_id=article.article_id, user_id=session['userInfo'].get('userId'),
-                op_type=globalinfoEnum.ARTICLE_LIKE.value).first()
-            if likerecord:
-                result['haveLike'] = True
-        db.session.commit()
-        return SuccessResponse(data=result)
-    except:
-        db.session.rollback()
-        abort(422)
+    articleid = request.values.get('articleId')
+    article = ForumArticle.query.filter_by(article_id=articleid).first()
+    # 判断是否可以访问
+    if not article or (article.status != 1 and (
+            session.get('userInfo') is None or json.loads(session['userInfo']).get(
+        'userId') != article.author_id or not
+            session['isAdmin'])):
+        abort(404)
+    # 打包返回结果
+    article.read_count += 1
+    result = {}
+    # 有附件
+    if article.attachment_type:
+        attachment = ForumArticleAttachment.query.filter_by(article_id=article.article_id).first()
+        result['attachment'] = attachment.to_dict()
+    # 是否已点赞
+    if session.get('userInfo'):
+        likerecord = LikeRecord.query.filter_by(
+            object_id=article.article_id, user_id=session['userInfo'].get('userId'),
+            op_type=globalinfoEnum.ARTICLE_LIKE.value).first()
+        if likerecord:
+            result['haveLike'] = True
+    db.session.commit()
+    article.post_time=article.post_time.strftime('%Y-%m-%d %H:%M:%S')
+    article.last_update_time=article.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
+    result['forumArticle'] = article.to_dict()
+    return SuccessResponse(data=result)
 
 
 @bp.route("/doLike", methods=['POST'])
@@ -67,29 +121,28 @@ def doLike():
     optype = request.values.get('opType')
     userid = session['userInfo'].get('userId')
     likerecord = LikeRecord()
-    likerecord.dolike(objectid=articleid,optype=optype,userid=userid)
+    likerecord.dolike(objectid=articleid, optype=optype, userid=userid)
     return SuccessResponse()
 
 
-def articleLike(objid, article, userid, optype):
-    likecord = LikeRecord.query.filter_by(object_id=objid, user_id=userid, op_type=optype).first()
-    try:
-        if not likecord:
-            new_likecord = LikeRecord(op_type=optype, object_id=objid, user_id=userid, create_time=datetime.now(),
-                                      author_user_id=article.author_id)
-            article.good_count += 1
-            db.session.add(new_likecord)
-            db.session.commit()
-            return None
-        else:
-            db.session.delete(likecord)
-            article.good_count -= 1
-            db.session.commit()
-            return likecord
-    except Exception as e:
-        print(e)
-        abort(422)
-
+# def articleLike(objid, article, userid, optype):
+#     likecord = LikeRecord.query.filter_by(object_id=objid, user_id=userid, op_type=optype).first()
+#     try:
+#         if not likecord:
+#             new_likecord = LikeRecord(op_type=optype, object_id=objid, user_id=userid, create_time=datetime.now(),
+#                                       author_user_id=article.author_id)
+#             article.good_count += 1
+#             db.session.add(new_likecord)
+#             db.session.commit()
+#             return None
+#         else:
+#             db.session.delete(likecord)
+#             article.good_count -= 1
+#             db.session.commit()
+#             return likecord
+#     except Exception as e:
+#         print(e)
+#         abort(422)
 
 @bp.route("/attachmentDownload", methods=['POST'])
 @login_required
@@ -101,23 +154,250 @@ def attachmentDownload():
     if file is None:
         abort(404, description="文件不存在")
     else:
-        try:
-            file.download_count += 1
-            # 记录消息
-            article = ForumArticle.query.filter_by(article_id=file.article_id).first()
-            usermessage = UserMessage(received_user_id=file.user_id, article_id=article.article_id,
-                                      article_title=article.title, send_user_id=session['userInfo'].get(
-                    'userId'), send_nick_name=session['userInfo'].get(
-                    'nickName'), message_type=MessageTypeEnum.ATTACHMENT_DOWNLOAD.value.get(
-                    'type'), create_time=datetime.now())
-            db.session.add(usermessage)
-            db.session.commit()
-        except Exception as e:
-            print(e)
-            db.session.rollback()
-            abort(422)
+        file.download_count += 1
+        # 记录消息
+        article = ForumArticle.query.filter_by(article_id=file.article_id).first()
+        usermessage = UserMessage(received_user_id=file.user_id, article_id=article.article_id,
+                                  article_title=article.title, send_user_id=session['userInfo'].get(
+                'userId'), send_nick_name=session['userInfo'].get(
+                'nickName'), message_type=MessageTypeEnum.ATTACHMENT_DOWNLOAD.value.get(
+                'type'), create_time=datetime.now())
+        db.session.add(usermessage)
+        db.session.commit()
         filename = file.file_name
         filename = filename.encode("utf-8").decode("latin1")  # 编码转换
         response = make_response(send_file(file.file_path))
         response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
         return response
+
+
+@bp.route("/loadBoard4Post", methods=['POST'])
+@login_required
+def loadBoard4Post():
+    userinfo = session['userInfo']
+    formboardinfo = ForumBoard.query.order_by('sort').all()
+    if not userinfo.get('isAdmin'):
+        formboardinfo = formboardinfo.filter_by(post_type=1)
+    formboardinfoList = []
+    for item in formboardinfo:
+        formboardinfoList.append(item.to_dict())
+    return SuccessResponse(data=convert_line_to_tree(formboardinfoList, 0))
+
+
+@bp.route("/postArticle", methods=['POST'])
+def postArticle():
+    cover = request.files.get('cover')  # 封面
+    attachment = request.files.get('attachment')  # 附件
+    title = request.values.get('title')  # 标题
+    pboardid = request.values.get('pBoardId')
+    boardid = request.values.get('boardId')
+    summary = request.values.get('summary')  # 摘要
+    editortype = request.values.get('editorType')
+    content = request.values.get('content')
+    markdowncontent = request.values.get('markdownContent')
+    userinfo = session['userInfo']
+    # 参数判断
+    if not title or len(title) > 150:
+        abort(400)
+    if not pboardid or not editortype or not content:
+        abort(400)
+    if len(summary) > 200:
+        abort(400)
+    if int(editortype) != globalinfoEnum.RICH.value and int(editortype) != globalinfoEnum.MARKDOWN.value:
+        abort(400)
+    # 去html
+    title = html.escape(title)
+    forumarticle = ForumArticle(p_board_id=pboardid,
+                                board_id=boardid,
+                                title=title,
+                                summary=summary,
+                                content=content,
+                                )
+    if int(editortype) == globalinfoEnum.MARKDOWN.value and not markdowncontent:
+        abort(400)
+    forumarticle.markdown_content = markdowncontent
+    forumarticle.editor_type = editortype
+    forumarticle.author_id = userinfo.get('userId')
+    forumarticle.nick_name = userinfo.get('nickName')
+    forumarticle.author_school = userinfo.get('school')
+    forumarticle.author_ip_address = userinfo.get('lastLoginIpAddress')
+    # 附件信息
+    forumattachment = ForumArticleAttachment(user_id=userinfo.get('userId'))
+    post(forumarticle, forumattachment, cover, attachment, userinfo.get('isAdmin'))
+    db.session.commit()
+    return SuccessResponse(data=forumarticle.article_id)
+
+
+# 文章上传
+def post(forumarticle, forumattachment, cover, attachment, isadmin):
+    try:
+        # 检查板块信息
+        resetBoardInfo(isadmin, forumarticle)
+
+        curdate = datetime.now()
+        forumarticle.article_id = generate_random_string(15)
+        forumarticle.post_time = curdate
+        forumarticle.last_update_time = curdate
+        # 如果有封面则上传封面
+        if cover:
+            # todo:根据一级板块显示不同 默认封面
+            fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
+            forumarticle.cover = fileuploaddto.getlocalPath()
+        # 如果有附件则上传
+        if attachment:
+            uploadAttachment(forumarticle, forumattachment, attachment, False)
+            forumarticle.attachment_type = 1
+        else:
+            forumarticle.attachment_type = 0
+        # 文章审核
+        if g.auditInfo.getPostAudit():
+            # todo:文章审核
+            forumarticle.status = 0
+        else:
+            forumarticle.status = 1
+            forumarticle.audit = 1
+        # 替换图片
+        content = forumarticle.content
+        # 替换文本中的/temp/
+        if content:
+            # 从temp中移走图片
+            month = resetimage(content)
+            replacemonth = '/' + month + '/'
+            content = content.replace('/temp/', replacemonth)
+            forumarticle.content = content
+            markdowncontent = forumarticle.markdown_content
+            if markdowncontent:
+                markdowncontent = markdowncontent.replace('/temp/', replacemonth)
+                forumarticle.markdown_content = markdowncontent
+
+        db.session.add(forumarticle)
+    except Exception as e:
+        print(e)
+        abort(422)
+
+
+# 从html解析image，并将image从temp文件中移入picture文件夹
+def resetimage(html):
+    month = datetime.now().strftime("%Y%m")
+    imagelist = getImageList(html)
+    for img in imagelist:
+        if img and 'temp' in img:
+            imagepath = img.replace('/api/file/getImage/', '')
+            imagefilename = month + '/' + img.split("/")[-1]
+            # 如果没有文件夹则创建
+            if not os.path.exists(config.IMAGE_PATH + '/' + month):
+                os.mkdir(config.IMAGE_PATH + month)
+            #     取出temp中的照片放入202305等文件夹
+            image = Image.open(config.IMAGE_PATH + '/' + imagepath)
+            image.save(config.IMAGE_PATH + '/' + imagefilename)
+    return month
+
+
+@bp.route("/articleDetail4Update", methods=['POST'])
+@login_required
+@check_params
+def articleDetail4Update():
+    articleid = request.values.get('articleId')
+    userinfo = session['userInfo']
+    article = ForumArticle.query.filter_by(article_id=articleid).first()
+    attachment = None
+    if not article or userinfo.get('userId') != article.author_id:
+        abort(400)
+    if article.attachment_type == 1:
+        attachment = ForumArticleAttachment.query.filter_by(article_id=article.article_id).first()
+    result = {}
+    article.post_time=article.post_time.strftime('%Y-%m-%d %H:%M:%S')
+    result['forumArticle'] = article.to_dict()
+    result['attachment'] = attachment.to_dict()
+    return SuccessResponse(data=result)
+
+
+@bp.route("/updateArticle", methods=['POST'])
+def updateArticle():
+    articleid = request.values.get('articleId')
+    attachmenttype = request.values.get('attachmentType')
+    cover = request.files.get('cover')  # 封面
+    attachment = request.files.get('attachment')  # 附件
+    title = request.values.get('title')  # 标题
+    pboardid = request.values.get('pBoardId')
+    boardid = request.values.get('boardId')
+    summary = request.values.get('summary')  # 摘要
+    editortype = request.values.get('editorType')
+    content = request.values.get('content')
+    markdowncontent = request.values.get('markdownContent')
+    userinfo = session['userInfo']
+    # 参数判断
+    if not title or len(title) > 150:
+        abort(400)
+    if not pboardid or not editortype or not content or not articleid or not attachmenttype:
+        abort(400)
+    if len(summary) > 200:
+        abort(400)
+    if int(editortype) != globalinfoEnum.RICH.value and int(editortype) != globalinfoEnum.MARKDOWN.value:
+        abort(400)
+    if int(editortype) == globalinfoEnum.MARKDOWN.value and not markdowncontent:
+        abort(400)
+    # 去html
+    title = html.escape(title)
+    # 查找需要修改的文章
+    forumarticle = ForumArticle.query.filter_by(article_id=articleid).first()
+    if not forumarticle or (not userinfo.get('isAdmin') and forumarticle.author_id != userinfo.get('userId')):
+        abort(400)
+    #  修改信息
+    forumarticle.p_board_id = pboardid
+    forumarticle.board_id = boardid
+    forumarticle.title = title
+    forumarticle.summary = summary
+    forumarticle.content = content
+    forumarticle.attachment_type = int(attachmenttype)
+    forumarticle.markdown_content = markdowncontent
+    forumarticle.editor_type = int(editortype)
+    forumarticle.author_id = userinfo.get('userId')
+    forumarticle.nick_name = userinfo.get('nickName')
+    forumarticle.author_school = userinfo.get('school')
+    forumarticle.author_ip_address = userinfo.get('lastLoginIpAddress')
+    # 附件信息
+    forumattachment = ForumArticleAttachment()
+
+    update(forumarticle, forumattachment, cover, attachment, userinfo.get('isAdmin'))
+    db.session.commit()
+    return SuccessResponse(data=forumarticle.to_dict())
+
+
+def update(forumarticle, forumattachment, cover, attachment, isadmin):
+    forumarticle.last_update_time = datetime.now()
+    resetBoardInfo(isadmin, forumarticle)
+    # 如果有封面则上传封面
+    if cover:
+        # todo:根据一级板块显示不同 默认封面
+        fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
+        forumarticle.cover = fileuploaddto.getlocalPath()
+    # 如果有附件则更新
+    if attachment:
+        uploadAttachment(forumarticle, forumattachment, attachment, True)
+    else:
+        dbattachment = ForumArticleAttachment.query.filter_by(article_id=forumarticle.article_id).first()
+        if dbattachment and forumarticle.attachment_type == 0:
+            os.remove(config.FILE_PATH + '/' + config.ATTACHMENT_FOLDER + '/' + dbattachment.file_path)
+            db.session.delete(dbattachment)
+    # 文章审核
+    if g.auditInfo.getPostAudit():
+        # todo:文章审核
+        forumarticle.status = 0
+    else:
+        forumarticle.status = 1
+        forumarticle.audit = 1
+
+    # 替换图片
+    content = forumarticle.content
+    # 替换文本中的/temp/
+    if content:
+        # 从temp中移走图片
+        month = resetimage(content)
+        replacemonth = '/' + month + '/'
+        content = content.replace('/temp/', replacemonth)
+        forumarticle.content = content
+        markdowncontent = forumarticle.markdown_content
+        if markdowncontent:
+            markdowncontent = markdowncontent.replace('/temp/', replacemonth)
+            forumarticle.markdown_content = markdowncontent
