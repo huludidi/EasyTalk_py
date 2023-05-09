@@ -1,6 +1,7 @@
 import html
 import json
 import os
+from math import ceil
 
 from PIL import Image
 
@@ -8,12 +9,15 @@ import config
 
 from datetime import datetime
 from flask import Blueprint, request, session, abort, make_response, send_file, g
+
+from Audit.textAudit import textAudit
 from functions import SuccessResponse, convert_line_to_tree, generate_random_string, \
     uploadFile2Local, generate_random_number, getImageList
-from decorators import check_params, login_required
+from decorators import check_params, login_required, rate_limit
 from exts import db
 from models import ForumBoard, ForumArticle, ForumArticleAttachment, LikeRecord, UserMessage
-from static.enums import globalinfoEnum, MessageTypeEnum, FileUploadTypeEnum, AttachmentTypeEnum
+from static.enums import globalinfoEnum, MessageTypeEnum, FileUploadTypeEnum, AttachmentTypeEnum, \
+    UserOperFrequencyTypeEnum
 
 bp = Blueprint("ForumArticle", __name__, url_prefix="/forum")
 
@@ -40,7 +44,7 @@ def uploadAttachment(article, forumattachment, file, isupload):
     allowsize = allowsizeMb * 1024 * 1024
     filesize = len(file.read())
     if filesize > allowsize:
-        abort(400,description="附件最大只能上传" + str(allowsizeMb) + "MB")
+        abort(400, description="附件最大只能上传" + str(allowsizeMb) + "MB")
 
     # 修改
     new_attachment = None
@@ -107,8 +111,8 @@ def getArticleDetail():
         if likerecord:
             result['haveLike'] = True
     db.session.commit()
-    article.post_time=article.post_time.strftime('%Y-%m-%d %H:%M:%S')
-    article.last_update_time=article.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
+    article.post_time = article.post_time.strftime('%Y-%m-%d %H:%M:%S')
+    article.last_update_time = article.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
     result['forumArticle'] = article.to_dict()
     return SuccessResponse(data=result)
 
@@ -116,6 +120,7 @@ def getArticleDetail():
 @bp.route("/doLike", methods=['POST'])
 @login_required
 @check_params
+@rate_limit(limit_type=UserOperFrequencyTypeEnum.DO_LIKE)
 def doLike():
     articleid = request.values.get('articleId')
     optype = request.values.get('opType')
@@ -123,26 +128,6 @@ def doLike():
     likerecord = LikeRecord()
     likerecord.dolike(objectid=articleid, optype=optype, userid=userid)
     return SuccessResponse()
-
-
-# def articleLike(objid, article, userid, optype):
-#     likecord = LikeRecord.query.filter_by(object_id=objid, user_id=userid, op_type=optype).first()
-#     try:
-#         if not likecord:
-#             new_likecord = LikeRecord(op_type=optype, object_id=objid, user_id=userid, create_time=datetime.now(),
-#                                       author_user_id=article.author_id)
-#             article.good_count += 1
-#             db.session.add(new_likecord)
-#             db.session.commit()
-#             return None
-#         else:
-#             db.session.delete(likecord)
-#             article.good_count -= 1
-#             db.session.commit()
-#             return likecord
-#     except Exception as e:
-#         print(e)
-#         abort(422)
 
 @bp.route("/attachmentDownload", methods=['POST'])
 @login_required
@@ -185,6 +170,8 @@ def loadBoard4Post():
 
 
 @bp.route("/postArticle", methods=['POST'])
+@login_required
+@rate_limit(limit_type=UserOperFrequencyTypeEnum.POST_ARTICLE)
 def postArticle():
     cover = request.files.get('cover')  # 封面
     attachment = request.files.get('attachment')  # 附件
@@ -239,10 +226,17 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
         forumarticle.post_time = curdate
         forumarticle.last_update_time = curdate
         # 如果有封面则上传封面
-        if cover:
-            # todo:根据一级板块显示不同 默认封面
-            fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
-            forumarticle.cover = fileuploaddto.getlocalPath()
+        if not cover:
+            # 上传默认封面
+            if forumarticle.p_board_id == '10000':#求助
+                cover = Image.open(config.IMAGE_PATH+'/help.png')
+            elif forumarticle.p_board_id == '10001':#分享
+                cover = Image.open(config.IMAGE_PATH+'/share.png')
+            elif forumarticle.p_board_id == '10002':#指南
+                cover = Image.open(config.IMAGE_PATH+'/guide.png')
+
+        fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
+        forumarticle.cover = fileuploaddto.getlocalPath()
         # 如果有附件则上传
         if attachment:
             uploadAttachment(forumarticle, forumattachment, attachment, False)
@@ -250,11 +244,13 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
         else:
             forumarticle.attachment_type = 0
         # 文章审核
+        forumarticle.status = 1
         if g.auditInfo.getPostAudit():
-            # todo:文章审核
-            forumarticle.status = 0
+            if textAudit(forumarticle.content):
+                forumarticle.audit = 1
+            else:
+                forumarticle.audit = 0
         else:
-            forumarticle.status = 1
             forumarticle.audit = 1
         # 替换图片
         content = forumarticle.content
@@ -306,7 +302,7 @@ def articleDetail4Update():
     if article.attachment_type == 1:
         attachment = ForumArticleAttachment.query.filter_by(article_id=article.article_id).first()
     result = {}
-    article.post_time=article.post_time.strftime('%Y-%m-%d %H:%M:%S')
+    article.post_time = article.post_time.strftime('%Y-%m-%d %H:%M:%S')
     result['forumArticle'] = article.to_dict()
     result['attachment'] = attachment.to_dict()
     return SuccessResponse(data=result)
@@ -369,7 +365,7 @@ def update(forumarticle, forumattachment, cover, attachment, isadmin):
     resetBoardInfo(isadmin, forumarticle)
     # 如果有封面则上传封面
     if cover:
-        # todo:根据一级板块显示不同 默认封面
+        os.remove(config.IMAGE_PATH+'/'+forumarticle.cover)
         fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
         forumarticle.cover = fileuploaddto.getlocalPath()
     # 如果有附件则更新
@@ -401,3 +397,29 @@ def update(forumarticle, forumattachment, cover, attachment, isadmin):
         if markdowncontent:
             markdowncontent = markdowncontent.replace('/temp/', replacemonth)
             forumarticle.markdown_content = markdowncontent
+
+
+@bp.route("/search", methods=['POST'])
+def search():
+    keyword = request.values.get('keyword')
+    if len(keyword) < 3:
+        abort(400, description="请求参数过短")
+    result = {
+        'totalCount': 0,
+        'pageNo': 1,
+        'pageSize': globalinfoEnum.PageSize.value,
+        'pageTotal': 0,
+        'list': []
+    }
+    # 根据标题模糊查询文章
+    articles = ForumArticle.query \
+        .filter(ForumArticle.title.like(f'%{keyword}%'))
+    total = articles.count()
+    articles = articles.paginate(page=1, per_page=globalinfoEnum.PageSize.value).items
+    for item in articles:
+        item.post_time = item.post_time.strftime('%Y-%m-%d %H:%M:%S')
+        item.last_update_time = item.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
+        result['list'].append(item.to_dict())
+    result['totalCount'] = total
+    result['pageTotal'] = ceil(total / globalinfoEnum.PageSize.value)
+    return SuccessResponse(data=result)

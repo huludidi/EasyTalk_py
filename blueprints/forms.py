@@ -45,3 +45,9 @@ class ResetPwdForm(wtforms.Form):
     password = wtforms.StringField(validators=[Length(min=8, max=18, message="密码格式错误！"),
                                                Regexp('^(?![0-9a-zA-Z]+$)[a-zA-Z0-9~!@#$%^&*?_-]{1,50}$',
                                                       message="密码格式错误")])
+
+class UpdateForm(wtforms.Form):
+    sex = wtforms.StringField(validators=[DataRequired(message="请输入性别")])
+    personDescription = wtforms.StringField(validators=[Length(min=3,max=150,message="内容过长或过短")])
+    school = wtforms.StringField(validators=[DataRequired(message="请选择学校")])
+    schoolEmail=wtforms.StringField(validators=[DataRequired(), Email(), Regexp('^[A-Za-z0-9._%+-]+@(([A-Za-z0-9-]+\.)+edu\.cn)$', message='请输入自己的学校邮箱')])

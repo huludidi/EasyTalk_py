@@ -2,14 +2,16 @@ import os
 
 from flask import Blueprint, request, abort, make_response, send_file
 
+from decorators import rate_limit
 from functions import SuccessResponse, generate_random_string
 import config
-from static.enums import globalinfoEnum
+from static.enums import globalinfoEnum, UserOperFrequencyTypeEnum
 
 bp = Blueprint("File", __name__, url_prefix="/file")
 
 
 @bp.route("/uploadImage", methods=['POST'])
+@rate_limit(limit_type=UserOperFrequencyTypeEnum.IMAGE_UPLOAD)
 def uploadImage():
     file = request.files.get('file')
     if not file:

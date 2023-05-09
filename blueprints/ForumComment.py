@@ -7,10 +7,10 @@ from sqlalchemy import desc, func, asc
 
 import config
 from functions import CustomResponse, SuccessResponse, uploadFile2Local
-from decorators import check_params, login_required
+from decorators import check_params, login_required, rate_limit
 from exts import db
 from models import LikeRecord, UserMessage, ForumComment, ForumArticle, UserInfo
-from static.enums import globalinfoEnum, MessageTypeEnum, FileUploadTypeEnum
+from static.enums import globalinfoEnum, MessageTypeEnum, FileUploadTypeEnum, UserOperFrequencyTypeEnum
 
 bp = Blueprint("ForumComment", __name__, url_prefix="/comment")
 
@@ -89,6 +89,7 @@ def get_comments(pcomment_list, userinfo, articleid):
 
 @bp.route("/doLike", methods=['POST'])
 @check_params
+@rate_limit(limit_type=UserOperFrequencyTypeEnum.DO_LIKE)
 def dolike():
     commentid = request.values.get('commentId')
 
@@ -108,6 +109,7 @@ def dolike():
 
 @bp.route("/postComment", methods=['POST'])
 @login_required
+@rate_limit(limit_type=UserOperFrequencyTypeEnum.POST_COMMENT)
 def postcomment():
     articleid = request.values.get('articleId')
     pcommentid = request.values.get('pCommentId')

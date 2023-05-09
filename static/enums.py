@@ -23,8 +23,9 @@ class globalinfoEnum(Enum):
     RICH = 0
     MARKDOWN = 1
 
+
 class AttachmentTypeEnum(Enum):
-    ZIP = {"type": 0, "suffix":globalinfoEnum.ATTACHMENT_SUFFIX.value}
+    ZIP = {"type": 0, "suffix": globalinfoEnum.ATTACHMENT_SUFFIX.value}
 
 
 class MessageTypeEnum(Enum):
@@ -34,21 +35,31 @@ class MessageTypeEnum(Enum):
     COMMENT_LIKE = {"type": 3, "code": "likeComment", "desc": "赞了我的评论"}
     ATTACHMENT_DOWNLOAD = {"type": 4, "code": "attachmentdownload", "desc": "下载了附件"}
 
+    @classmethod
+    def getByType(cls, Type):
+        for item in cls:
+            if item.value.get("type") == Type:
+                return item
+
+    @classmethod
+    def getByCode(cls, Code):
+        for item in cls:
+            if item.value.get("code") == Code:
+                return item
+
 
 class FileUploadTypeEnum(Enum):
-    ARTICLE_COVER = {"desc": "文章封面","suffix":globalinfoEnum.IMAGE_SUFFIX.value}
-    ARTICLE_ATTACHMENT = {"desc": "文章附件","suffix":globalinfoEnum.ATTACHMENT_SUFFIX.value}
-    COMMENT_IMAGE = {"desc": "评论图片","suffix":globalinfoEnum.IMAGE_SUFFIX.value}
-    AVATAR = {"desc": "个人头像","suffix":globalinfoEnum.IMAGE_SUFFIX.value}
+    ARTICLE_COVER = {"desc": "文章封面", "suffix": globalinfoEnum.IMAGE_SUFFIX.value}
+    ARTICLE_ATTACHMENT = {"desc": "文章附件", "suffix": globalinfoEnum.ATTACHMENT_SUFFIX.value}
+    COMMENT_IMAGE = {"desc": "评论图片", "suffix": globalinfoEnum.IMAGE_SUFFIX.value}
+    AVATAR = {"desc": "个人头像", "suffix": globalinfoEnum.IMAGE_SUFFIX.value}
 
-#
-# class ArticleOrderTypeEnum(Enum):
-#     NEW = {"type": 0, "orderSql": "desc('post_time')"}
-#     COMMENT = {"type": 1, "orderSql": "desc('comment_count')"}
-#
-#     @classmethod
-#     def getByType(cls, Type):
-#         for item in cls:
-#             if item.value.get("type") == Type:
-#                 return item
-#         return None
+
+class UserOperFrequencyTypeEnum(Enum):
+    NO_CHECK = 0
+    POST_ARTICLE = 1
+    POST_COMMENT = 2
+    DO_LIKE = 3
+    IMAGE_UPLOAD = 4
+
+

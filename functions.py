@@ -63,8 +63,13 @@ def uploadFile2Local(file, folder, uploadtypeenum):
 
         if uploadtypeenum == FileUploadTypeEnum.AVATAR:
             targetfolder = basepath + config.PICTURE_FOLDER + config.AVATAR_FOLDER
+            filesuffix = "jpg"
             localpath = folder + '.' + filesuffix
             filename = folder + '.' + filesuffix
+            # 将图片转换为 JPG 格式
+            file = Image.open(file.stream)
+            file = file.convert('RGB')
+
 
         # 判断文件路径是否存在，不存在则创建
         if not os.path.exists(targetfolder):
@@ -107,6 +112,8 @@ def contentAudit(content):
         return "Error: Content Violates Platform Rules!"
     else:
         return "Content is Normal and Compliable with Platform Rules."
+
+# 图片审核
 
 
 def SuccessResponse(data=None):

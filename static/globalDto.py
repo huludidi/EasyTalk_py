@@ -4,7 +4,6 @@ from flask import jsonify
 # 管理员账号
 ADMIN_EMAIL = ["2488687107@qq.com"]
 
-
 # 审核权限
 class Audit:
     def __init__(self, commentAudit=None, postAudit=None):
@@ -143,7 +142,7 @@ class Post:
         return self.dayImageUploadCount
 
     def getpostDayCountThreshold(self):
-        return self.getpostDayCountThreshold
+        return self.postDayCountThreshold
 
     def getpostIntegral(self):
         return self.postIntegral

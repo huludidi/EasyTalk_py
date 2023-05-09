@@ -1,6 +1,6 @@
 import json
 
-from flask import Flask, session, g, jsonify
+from flask import Flask, g, jsonify
 from werkzeug.exceptions import BadRequest
 
 from exts import db, mail
@@ -16,7 +16,7 @@ from blueprints.Ucenter import bp as uc_bp
 
 
 from flask_migrate import Migrate
-from static.globalDto import Audit, Comment, Email, Like, Post, Register
+from static.globalDto import Audit, Comment, Like, Post, Register
 
 app = Flask(__name__)
 # 绑定配置文件
@@ -32,31 +32,36 @@ db.init_app(app)
 migrate = Migrate(app, db)
 mail.init_app(app)
 
+with app.app_context():
+    @app.before_request
+    def my_before_request():
+        # 注册设置
+        syssetting = SysSetting.query.filter_by(code="register").first()
+        register_dict = json.loads(syssetting.json_content)
+        register = Register(register_dict.get("registerWelcomInfo"))
+        setattr(g, "registerInfo", register)
+        # 评论设置
+        syssetting = SysSetting.query.filter_by(code="comment").first()
+        comment_dict = json.loads(syssetting.json_content)
+        comment = Comment(comment_dict.get("commentDayCountThreshold"), comment_dict.get("commentIntegral"),
+                          comment_dict.get("commentOpen"))
+        setattr(g, "commentInfo", comment)
+        # 审核
+        syssetting = SysSetting.query.filter_by(code="audit").first()
+        audit_dict = json.loads(syssetting.json_content)
+        audit = Audit(audit_dict.get("commentAudit"), audit_dict.get("postAudit"))
+        setattr(g, "auditInfo", audit)
+        # 附件
+        syssetting = SysSetting.query.filter_by(code="post").first()
+        post_dict = json.loads(syssetting.json_content)
+        post = Post(post_dict.get("attachmentSize"), post_dict.get("dayImageUploadCount"),post_dict.get("postDayCountThreshold"))
+        setattr(g, "postInfo", post)
 
-# 钩子函数
-@app.before_request
-def my_before_request():
-    # 注册设置
-    syssetting = SysSetting.query.filter_by(code="register").first()
-    register_dict = json.loads(syssetting.json_content)
-    register = Register(register_dict.get("registerWelcomInfo"))
-    setattr(g, "registerInfo", register)
-    # 评论设置
-    syssetting = SysSetting.query.filter_by(code="comment").first()
-    comment_dict = json.loads(syssetting.json_content)
-    comment = Comment(comment_dict.get("commentDayCountThreshold"), comment_dict.get("commentIntegral"),
-                      comment_dict.get("commentOpen"))
-    setattr(g, "commentInfo", comment)
-    # 审核
-    syssetting = SysSetting.query.filter_by(code="audit").first()
-    audit_dict = json.loads(syssetting.json_content)
-    audit = Audit(audit_dict.get("commentAudit"), audit_dict.get("postAudit"))
-    setattr(g, "auditInfo", audit)
-    # 附件
-    syssetting = SysSetting.query.filter_by(code="post").first()
-    post_dict = json.loads(syssetting.json_content)
-    post = Post(post_dict.get("attachmentSize"), post_dict.get("dayImageUploadCount"),post_dict.get("postDayCountThreshold"))
-    setattr(g, "postInfo", post)
+        # 点赞
+        syssetting = SysSetting.query.filter_by(code="like").first()
+        like_dict = json.loads(syssetting.json_content)
+        like = Like(like_dict.get("likeDayCountThreshold"))
+        setattr(g, "likeInfo", like)
 
 @app.errorhandler(500)
 def code_500_error(error):
@@ -96,7 +101,7 @@ def code_500_error(error):
     }
     return jsonify(error_message), 422
 
-#
+
 # @app.context_processor
 # # 上下文处理器,每个模板中都会有user
 # def my_context_processor():

@@ -345,3 +345,6 @@ class UserMessage(db.Model):
     message_content = db.Column(db.String(1000), comment='消息内容')
     status = db.Column(db.Integer, index=True, server_default=text('1'), comment='1:未读 2:已读')
     create_time = db.Column(db.DateTime, comment='创建时间')
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
