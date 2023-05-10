@@ -23,6 +23,7 @@ MAIL_DEFAULT_SENDER = "1398471354@qq.com"
 FILE_PATH="E:/stdio/毕设/file"
 # 上传图片地址
 IMAGE_PATH="E:/stdio/毕设/file/picture"
+BOARD_FOLDER="/board"
 PICTURE_FOLDER="/picture"
 TEMP_FOLDER="/temp"
 AVATAR_FOLDER="/avatar"

@@ -5,7 +5,6 @@ from math import ceil
 from flask import abort, session
 from sqlalchemy import text, func
 
-from functions import CustomResponse
 from exts import db
 from static.enums import globalinfoEnum, MessageTypeEnum
 
@@ -193,7 +192,7 @@ class ForumComment(db.Model):
     top_type = db.Column(db.Boolean, index=True, server_default=text('0'), comment='0:未置顶  1:置顶')
     post_time = db.Column(db.DateTime, index=True, comment='发布时间')
     good_count = db.Column(db.Integer, server_default=text('0'), comment='good数量')
-    status = db.Column(db.Boolean,server_default=text('0'), index=True, comment='0:待审核  1:已审核')
+    status = db.Column(db.Integer,server_default=text('0'), index=True, comment='0:待审核  1:已审核')
     audit = db.Column(db.Boolean, index=True, comment='0:审核通过  1:审核未通过')
 
     def to_dict(self):

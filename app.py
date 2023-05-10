@@ -12,6 +12,10 @@ from blueprints.ForumArticle import bp as fa_bp
 from blueprints.ForumComment import bp as fc_bp
 from blueprints.File import bp as f_bp
 from blueprints.Ucenter import bp as uc_bp
+from blueprints.ManageArticle import bp as ma_bp
+from blueprints.ManageBoard import bp as mb_bp
+
+
 
 
 
@@ -27,6 +31,8 @@ app.register_blueprint(fb_bp)
 app.register_blueprint(fc_bp)
 app.register_blueprint(f_bp)
 app.register_blueprint(uc_bp)
+app.register_blueprint(ma_bp)
+app.register_blueprint(mb_bp)
 
 db.init_app(app)
 migrate = Migrate(app, db)

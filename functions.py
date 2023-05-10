@@ -9,6 +9,7 @@ from flask import jsonify, abort
 import jieba
 
 import config
+from Audit.imageAudit import image_audit
 from static.enums import FileUploadTypeEnum
 from static.globalDto import FileUpload
 
@@ -98,22 +99,6 @@ def uploadFile2Local(file, folder, uploadtypeenum):
         return fileuploaddto
     except Exception as e:
         print(e)
-
-
-# 文本内容审核
-def contentAudit(content):
-    # 敏感词库
-    sensitive_words = {"色情", "暴力", "广告", "赌博"}
-    # 分词
-    words = set(jieba.cut(content))
-
-    # 检测是否有敏感词
-    if words & sensitive_words:
-        return "Error: Content Violates Platform Rules!"
-    else:
-        return "Content is Normal and Compliable with Platform Rules."
-
-# 图片审核
 
 
 def SuccessResponse(data=None):

@@ -1,7 +1,9 @@
+import io
 import os
 
-from flask import Blueprint, request, abort, make_response, send_file
+from flask import Blueprint, request, abort, make_response, send_file, g
 
+from Audit.imageAudit import image_audit
 from decorators import rate_limit
 from functions import SuccessResponse, generate_random_string
 import config
@@ -21,9 +23,13 @@ def uploadImage():
     if not allowed_file(filename):
         abort(400, description="文件格式不允许")
     file.save(config.IMAGE_PATH + config.TEMP_FOLDER + '/' + filename)
+    if g.auditInfo.getPostAudit():
+        if not image_audit(config.IMAGE_PATH + config.TEMP_FOLDER + '/' + filename):
+            abort(400,description="图片违规，请选择合法图片")
     result = {
         'filename': config.TEMP_FOLDER + "/" + filename
     }
+    # 读取文件数据
     return SuccessResponse(data=result)
 
 

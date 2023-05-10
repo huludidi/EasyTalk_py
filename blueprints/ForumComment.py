@@ -6,6 +6,8 @@ from flask import Blueprint, request, session, abort, g
 from sqlalchemy import desc, func, asc
 
 import config
+from Audit.imageAudit import image_audit
+from Audit.textAudit import textAudit
 from functions import CustomResponse, SuccessResponse, uploadFile2Local
 from decorators import check_params, login_required, rate_limit
 from exts import db
@@ -147,7 +149,7 @@ def postcomment():
     # 返回参数
     if pcommentid != '0':
         comments = ForumComment.query \
-            .filter_by(p_comment_id=pcommentid, article_id=articleid) \
+            .filter_by(p_comment_id=pcommentid, article_id=articleid, status=1, audit=1) \
             .order_by(asc(ForumComment.comment_id)).all()
         children = []
         for item in comments:
@@ -174,18 +176,27 @@ def post(comment, image):
             abort(400, description="回复的用户不存在")
         comment.nick_name = user.nick_name
     if image:
-        # todo:图片审核
         uploaddto = uploadFile2Local(image, config.PICTURE_FOLDER, FileUploadTypeEnum.COMMENT_IMAGE)
         comment.img_path = uploaddto.getlocalPath()
-
-    # 是否需要审核
-    needaudit = g.auditInfo.getCommentAudit()
-    comment.status = globalinfoEnum.HAVE_AUDITED.value
-    comment.audit = globalinfoEnum.PASS.value
-    if needaudit:
-        # TODO:评论审核并发送消息
-        return
     db.session.add(comment)
+    if g.auditInfo.getPostAudit():
+        comment.status = 1
+        contentaudit = 0
+        imageaudit = 0
+        if comment.content:
+            contentaudit = textAudit(comment.content)
+        if comment.img_path:
+            imageaudit = image_audit(config.IMAGE_PATH + '/' + comment.img_path)
+        if contentaudit and imageaudit:
+            comment.audit = globalinfoEnum.PASS.value
+        else:
+            comment.audit = globalinfoEnum.NO_PASS.value
+            message = UserMessage(received_user_id=comment.user_id,
+                                  message_type=MessageTypeEnum.SYS.value.get('type'),
+                                  message_content="您的评论含不正当言论！！请注意言辞",
+                                  create_time=datetime.now())
+            db.session.add(message)
+            return
     updateCommentInfo(comment, article, pcomment)
 
 

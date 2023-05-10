@@ -10,6 +10,7 @@ import config
 from datetime import datetime
 from flask import Blueprint, request, session, abort, make_response, send_file, g
 
+from Audit.imageAudit import image_audit
 from Audit.textAudit import textAudit
 from functions import SuccessResponse, convert_line_to_tree, generate_random_string, \
     uploadFile2Local, generate_random_number, getImageList
@@ -220,7 +221,6 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
     try:
         # 检查板块信息
         resetBoardInfo(isadmin, forumarticle)
-
         curdate = datetime.now()
         forumarticle.article_id = generate_random_string(15)
         forumarticle.post_time = curdate
@@ -229,14 +229,17 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
         if not cover:
             # 上传默认封面
             if forumarticle.p_board_id == '10000':#求助
-                cover = Image.open(config.IMAGE_PATH+'/help.png')
+                # cover = Image.open(config.IMAGE_PATH+'/help.png')
+                forumarticle.cover='/board/help.png'
             elif forumarticle.p_board_id == '10001':#分享
-                cover = Image.open(config.IMAGE_PATH+'/share.png')
+                # cover = Image.open(config.IMAGE_PATH+'/share.png')
+                forumarticle.cover='board//share.png'
             elif forumarticle.p_board_id == '10002':#指南
-                cover = Image.open(config.IMAGE_PATH+'/guide.png')
-
-        fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
-        forumarticle.cover = fileuploaddto.getlocalPath()
+                # cover = Image.open(config.IMAGE_PATH+'/guide.png')
+                forumarticle.cover='/board/guide.png'
+        else:
+            fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
+            forumarticle.cover = fileuploaddto.getlocalPath()
         # 如果有附件则上传
         if attachment:
             uploadAttachment(forumarticle, forumattachment, attachment, False)
@@ -246,12 +249,17 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
         # 文章审核
         forumarticle.status = 1
         if g.auditInfo.getPostAudit():
-            if textAudit(forumarticle.content):
+            contentaudit=textAudit(forumarticle.content)
+            imageaudit=True
+            if cover:
+                imageaudit=image_audit(config.IMAGE_PATH+'/'+forumarticle.cover)
+            if contentaudit and imageaudit:
                 forumarticle.audit = 1
             else:
                 forumarticle.audit = 0
         else:
             forumarticle.audit = 1
+
         # 替换图片
         content = forumarticle.content
         # 替换文本中的/temp/
@@ -368,6 +376,17 @@ def update(forumarticle, forumattachment, cover, attachment, isadmin):
         os.remove(config.IMAGE_PATH+'/'+forumarticle.cover)
         fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
         forumarticle.cover = fileuploaddto.getlocalPath()
+    # 文章审核
+    forumarticle.status = 1
+    if g.auditInfo.getPostAudit():
+        textaudit = textAudit(forumarticle.content)
+        imageaudit = False
+        if cover:
+            imageaudit = image_audit(config.IMAGE_PATH+'/'+forumarticle.cover)
+        if textaudit and imageaudit:
+            forumarticle.audit = 1
+        else:
+            forumarticle.audit = 0
     # 如果有附件则更新
     if attachment:
         uploadAttachment(forumarticle, forumattachment, attachment, True)
@@ -376,13 +395,6 @@ def update(forumarticle, forumattachment, cover, attachment, isadmin):
         if dbattachment and forumarticle.attachment_type == 0:
             os.remove(config.FILE_PATH + '/' + config.ATTACHMENT_FOLDER + '/' + dbattachment.file_path)
             db.session.delete(dbattachment)
-    # 文章审核
-    if g.auditInfo.getPostAudit():
-        # todo:文章审核
-        forumarticle.status = 0
-    else:
-        forumarticle.status = 1
-        forumarticle.audit = 1
 
     # 替换图片
     content = forumarticle.content
