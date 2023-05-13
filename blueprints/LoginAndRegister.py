@@ -1,10 +1,9 @@
-import io
 import json
 import random
 import string
 import requests
 
-from flask import Blueprint, request, send_file, jsonify, make_response, session, g, abort
+from flask import Blueprint, request, jsonify, make_response, session, g, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 from captcha.image import ImageCaptcha
 from flask_mail import Message

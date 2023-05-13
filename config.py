@@ -1,6 +1,6 @@
 
 SECRET_KEY = "xiaoxiong"
-
+CACHE_TYPE = 'simple'
 # 数据库配置信息
 HOSTNAME = '127.0.0.1'
 PORT = '3306'

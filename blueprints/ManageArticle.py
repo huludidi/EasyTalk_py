@@ -1,10 +1,7 @@
 from datetime import datetime
 from math import ceil
-
 from flask import Blueprint, request, abort, make_response, send_file, session
 from sqlalchemy import desc, func
-
-from blueprints.ForumComment import get_comments
 from decorators import check_params, check_admin
 from exts import db
 from functions import SuccessResponse
@@ -78,6 +75,7 @@ def delArticle():
     id_list = articleids.split(",")
     for item in id_list:
         singledel(item)
+    db.session.commit()
     return SuccessResponse()
 
 
@@ -92,7 +90,6 @@ def singledel(articleid):
                           status=globalinfoEnum.NO_READ.value,
                           message_content=f"您的{article.title}文章已被管理员删除")
     db.session.add(message)
-    db.session.commit()
 
 
 @bp.route("/updateBoard", methods=['POST'])
@@ -138,7 +135,7 @@ def attachmentDownload():
                                   article_title=article.title, send_user_id=session['userInfo'].get(
                 'userId'), send_nick_name=session['userInfo'].get(
                 'nickName'), message_type=MessageTypeEnum.ATTACHMENT_DOWNLOAD.value.get(
-                'type'), create_time=datetime.now())
+                'type'), message_content=f"管理员下载了{article.title}中的附件", create_time=datetime.now())
         db.session.add(usermessage)
         db.session.commit()
         filename = file.file_name

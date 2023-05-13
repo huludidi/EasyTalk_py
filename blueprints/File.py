@@ -1,4 +1,3 @@
-import io
 import os
 
 from flask import Blueprint, request, abort, make_response, send_file, g

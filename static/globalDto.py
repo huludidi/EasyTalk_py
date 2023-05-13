@@ -4,6 +4,7 @@ from flask import jsonify
 # 管理员账号
 ADMIN_EMAIL = ["2488687107@qq.com"]
 
+
 # 审核权限
 class Audit:
     def __init__(self, commentAudit=None, postAudit=None):
@@ -34,15 +35,13 @@ class Audit:
 
 # 评论设置
 class Comment:
-    def __init__(self, commentDayCountThreshold=None, commentIntegral=None, commentOpen=None):
+    def __init__(self, commentDayCountThreshold=None, commentOpen=None):
         self.commentDayCountThreshold = commentDayCountThreshold
-        self.commentIntegral = commentIntegral
         self.commentOpen = commentOpen
 
     def to_dict(self):
         return {
             'commentDayCountThreshold': self.commentDayCountThreshold,
-            'commentIntegral': self.commentIntegral,
             'commentOpen': self.commentOpen,
         }
 
@@ -52,17 +51,11 @@ class Comment:
     def getcommentDayCountThreshold(self):
         return self.commentDayCountThreshold
 
-    def getcommentIntegral(self):
-        return self.commentIntegral
-
     def getcommentOpen(self):
         return self.commentOpen
 
     def setcommentDayCountThreshold(self, commentDayCountThreshold):
         self.commentDayCountThreshold = commentDayCountThreshold
-
-    def setcommentIntegral(self, commentIntegral):
-        self.commentIntegral = commentIntegral
 
     def setcommentOpen(self, commentOpen):
         self.commentOpen = commentOpen
@@ -122,14 +115,12 @@ class Post:
         self.attachmentSize = attachmentSize
         self.dayImageUploadCount = dayImageUploadCount
         self.postDayCountThreshold = postDayCountThreshold
-        self.postIntegral = postIntegral
 
     def to_dict(self):
         return {
             'attachmentSize': self.attachmentSize,
             'dayImageUploadCount': self.dayImageUploadCount,
             'postDayCountThreshold': self.postDayCountThreshold,
-            'postIntegral': self.postIntegral,
         }
 
     def to_json(self):
@@ -144,9 +135,6 @@ class Post:
     def getpostDayCountThreshold(self):
         return self.postDayCountThreshold
 
-    def getpostIntegral(self):
-        return self.postIntegral
-
     def setattachmentSize(self, attachmentSize):
         self.attachmentSize = attachmentSize
 
@@ -155,9 +143,6 @@ class Post:
 
     def setpostDayCountThreshold(self, postDayCountThreshold):
         self.postDayCountThreshold = postDayCountThreshold
-
-    def setpostIntegral(self, postIntegral):
-        self.postIntegral = postIntegral
 
 
 # 注册设置
@@ -204,3 +189,61 @@ class FileUpload:
 
     def setoriginalFileName(self, originalFileName):
         self.originalFileName = originalFileName
+
+
+class SysSettingDto:
+
+    def __init__(self, audit=None, comment=None, post=None, like=None, email=None,
+                 register=None):
+        self.audit = audit
+        self.comment = comment
+        self.post = post
+        self.like = like
+        self.email = email
+        self.register = register
+
+    def to_dict(self):
+        return {
+            'audit': self.audit,
+            'comment': self.comment,
+            'post': self.post,
+            'like': self.like,
+            'email': self.email,
+            'register': self.register,
+        }
+
+    def setAudit(self, audit):
+        self.audit = audit
+
+    def setComment(self, comment):
+        self.comment = comment
+
+    def setPost(self, post):
+        self.post = post
+
+    def setLike(self, like):
+        self.like = like
+
+    def setEmail(self, email):
+        self.email = email
+
+    def setRegister(self, register):
+        self.register = register
+
+    def getAudit(self):
+        return self.audit
+
+    def getComment(self):
+        return self.comment
+
+    def getPost(self):
+        return self.post
+
+    def getLike(self):
+        return self.like
+
+    def getEmail(self):
+        return self.email
+
+    def getRegister(self):
+        return self.register

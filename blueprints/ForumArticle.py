@@ -130,12 +130,13 @@ def doLike():
     likerecord.dolike(objectid=articleid, optype=optype, userid=userid)
     return SuccessResponse()
 
+
 @bp.route("/attachmentDownload", methods=['POST'])
 @login_required
 @check_params
 def attachmentDownload():
     fileid = request.values.get('fileId')
-    # fileid = request.args.get('fileId')
+    userinfo = session['userInfo']
     file = ForumArticleAttachment.query.filter_by(file_id=fileid).first()
     if file is None:
         abort(404, description="文件不存在")
@@ -147,7 +148,8 @@ def attachmentDownload():
                                   article_title=article.title, send_user_id=session['userInfo'].get(
                 'userId'), send_nick_name=session['userInfo'].get(
                 'nickName'), message_type=MessageTypeEnum.ATTACHMENT_DOWNLOAD.value.get(
-                'type'), create_time=datetime.now())
+                'type'), message_content=f"用户{userinfo['userId']}下载了{article.title}中的附件",
+                                  create_time=datetime.now())
         db.session.add(usermessage)
         db.session.commit()
         filename = file.file_name
@@ -228,15 +230,10 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
         # 如果有封面则上传封面
         if not cover:
             # 上传默认封面
-            if forumarticle.p_board_id == '10000':#求助
-                # cover = Image.open(config.IMAGE_PATH+'/help.png')
-                forumarticle.cover='/board/help.png'
-            elif forumarticle.p_board_id == '10001':#分享
-                # cover = Image.open(config.IMAGE_PATH+'/share.png')
-                forumarticle.cover='board//share.png'
-            elif forumarticle.p_board_id == '10002':#指南
-                # cover = Image.open(config.IMAGE_PATH+'/guide.png')
-                forumarticle.cover='/board/guide.png'
+            board = ForumBoard.query.filter_by(p_board_id=0, board_id=forumarticle.p_board_id).first()
+            if not board:
+                abort(400)
+            forumarticle.cover = board.cover
         else:
             fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
             forumarticle.cover = fileuploaddto.getlocalPath()
@@ -249,10 +246,10 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
         # 文章审核
         forumarticle.status = 1
         if g.auditInfo.getPostAudit():
-            contentaudit=textAudit(forumarticle.content)
-            imageaudit=True
+            contentaudit = textAudit(forumarticle.content)
+            imageaudit = True
             if cover:
-                imageaudit=image_audit(config.IMAGE_PATH+'/'+forumarticle.cover)
+                imageaudit = image_audit(config.IMAGE_PATH + '/' + forumarticle.cover)
             if contentaudit and imageaudit:
                 forumarticle.audit = 1
             else:
@@ -373,7 +370,7 @@ def update(forumarticle, forumattachment, cover, attachment, isadmin):
     resetBoardInfo(isadmin, forumarticle)
     # 如果有封面则上传封面
     if cover:
-        os.remove(config.IMAGE_PATH+'/'+forumarticle.cover)
+        os.remove(config.IMAGE_PATH + '/' + forumarticle.cover)
         fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
         forumarticle.cover = fileuploaddto.getlocalPath()
     # 文章审核
@@ -382,7 +379,7 @@ def update(forumarticle, forumattachment, cover, attachment, isadmin):
         textaudit = textAudit(forumarticle.content)
         imageaudit = False
         if cover:
-            imageaudit = image_audit(config.IMAGE_PATH+'/'+forumarticle.cover)
+            imageaudit = image_audit(config.IMAGE_PATH + '/' + forumarticle.cover)
         if textaudit and imageaudit:
             forumarticle.audit = 1
         else:

@@ -126,9 +126,6 @@ class ForumArticle(db.Model):
                 'pageTotal': ceil(total_count / globalinfoEnum.PageSize.value),
                 'list': result
             }
-        # except Exception as e:
-        #     print(e)
-        #     abort(422)
 
 
 class ForumArticleAttachment(db.Model):
@@ -314,6 +311,8 @@ class UserInfo(db.Model):
     school_email = db.Column(db.VARCHAR(150), comment='用户的学校邮箱')
     status = db.Column(db.Boolean, comment='0:禁用 1:正常')
 
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class UserIntegralRecord(db.Model):
     __tablename__ = 'user_integral_record'
@@ -344,6 +343,18 @@ class UserMessage(db.Model):
     message_content = db.Column(db.String(1000), comment='消息内容')
     status = db.Column(db.Integer, index=True, server_default=text('1'), comment='1:未读 2:已读')
     create_time = db.Column(db.DateTime, comment='创建时间')
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+class SchoolInfo(db.Model):
+    __tablename__ = 'school_info'
+
+    id = db.Column(db.Integer,primary_key=True)
+    ch_name = db.Column(db.String(255))
+    en_name = db.Column(db.String(255))
+    longitude = db.Column(db.String(255))
+    latitude = db.Column(db.String(255))
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

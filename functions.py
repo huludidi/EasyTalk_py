@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import re
@@ -6,13 +7,33 @@ from datetime import datetime
 
 from PIL import Image
 from flask import jsonify, abort
-import jieba
 
 import config
-from Audit.imageAudit import image_audit
+from exts import cache
+from models import SysSetting
 from static.enums import FileUploadTypeEnum
-from static.globalDto import FileUpload
+from static.globalDto import FileUpload, SysSettingDto
 
+# 刷新缓存
+def refresh_cache():
+    cache.clear()
+    system_settings = SysSetting.query.all()  # 从数据库中获取系统设置数据
+    syssettingDto = SysSettingDto()
+    for setting in system_settings:
+        if setting.code == 'audit':
+            syssettingDto.setAudit(json.loads(setting.json_content))
+        elif setting.code == 'comment':
+            syssettingDto.setComment(json.loads(setting.json_content))
+        elif setting.code == 'email':
+            syssettingDto.setEmail(json.loads(setting.json_content))
+        elif setting.code == 'like':
+            syssettingDto.setLike(json.loads(setting.json_content))
+        elif setting.code == 'post':
+            syssettingDto.setPost(json.loads(setting.json_content))
+        elif setting.code == 'register':
+            syssettingDto.setRegister(json.loads(setting.json_content))
+        cache.set(setting.code, json.loads(setting.json_content))  # 将数据放入缓存
+    return syssettingDto.to_dict()
 # 获取板块
 def convert_line_to_tree(data_list, pid):
     children = []

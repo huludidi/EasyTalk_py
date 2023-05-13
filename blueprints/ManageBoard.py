@@ -1,14 +1,11 @@
-
-
-from flask import Blueprint, request, abort, make_response, send_file, session
-from sqlalchemy import desc, func
+from flask import Blueprint, request, abort
 
 import config
 from decorators import check_params, check_admin
 from exts import db
 from functions import SuccessResponse, convert_line_to_tree, uploadFile2Local
-from models import ForumBoard, ForumArticle, UserMessage, ForumArticleAttachment, LikeRecord, ForumComment
-from static.enums import globalinfoEnum, MessageTypeEnum, FileUploadTypeEnum
+from models import ForumBoard, ForumArticle
+from static.enums import  FileUploadTypeEnum
 
 bp = Blueprint("ManageBoard", __name__, url_prefix="/manageBoard")
 
@@ -16,7 +13,7 @@ bp = Blueprint("ManageBoard", __name__, url_prefix="/manageBoard")
 @bp.route("/loadBoard", methods=['POST'])
 @check_admin
 def loadBoard():
-    formboardinfo = ForumBoard.query.all()
+    formboardinfo = ForumBoard.query.order_by(ForumBoard.sort.asc()).all()
     formboardinfoList = []
     for item in formboardinfo:
         formboardinfoList.append(item.to_dict())
@@ -46,12 +43,15 @@ def saveBoard():
             result = 0 if board.p_board_id == 0 else 1
             updateBoardNameBatch(boardname=boardName, boardtype=result, boardid=boardId)
     else:  # 新增
+        if pBoardId == '0' and not cover:
+            abort(400, description="请传入板块图片")
         board = ForumBoard(p_board_id=pBoardId, board_name=boardName, board_desc=boardDesc)
         count = ForumBoard.query.filter_by(p_board_id=board.p_board_id).count()
         board.sort = count + 1
         db.session.add(board)
     if cover:
-        uploadDto = uploadFile2Local(cover, config.BOARD_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
+        uploadDto = uploadFile2Local(cover, config.PICTURE_FOLDER + config.BOARD_FOLDER,
+                                     FileUploadTypeEnum.ARTICLE_COVER)
         board.cover = uploadDto.getlocalPath()
     try:
         db.session.commit()
@@ -92,4 +92,18 @@ def delBoard():
     if board:
         db.session.delete(board)
         db.session.commit()
+    return SuccessResponse()
+
+
+@bp.route("/changeBoardSort", methods=['POST'])
+@check_admin
+@check_params
+def changeSort():
+    boardId = request.values.get('boardId')
+    # 传入排好序的id数组
+    boardId_dict = boardId.split(",")
+    for index, value in enumerate(boardId_dict):
+        board = ForumBoard.query.filter_by(board_id=value).first()
+        board.sort = index + 1
+    db.session.commit()
     return SuccessResponse()

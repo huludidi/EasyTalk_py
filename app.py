@@ -3,7 +3,8 @@ import json
 from flask import Flask, g, jsonify
 from werkzeug.exceptions import BadRequest
 
-from exts import db, mail
+from exts import db, mail, cache
+from functions import refresh_cache
 from models import SysSetting
 import config
 from blueprints.LoginAndRegister import bp as lar_bp
@@ -14,13 +15,13 @@ from blueprints.File import bp as f_bp
 from blueprints.Ucenter import bp as uc_bp
 from blueprints.ManageArticle import bp as ma_bp
 from blueprints.ManageBoard import bp as mb_bp
-
-
-
+from blueprints.SysSetting import bp as ss_bp
+from blueprints.ManageUserInfo import bp as mui_bp
+from blueprints.ManageDataShow import bp as mds_bp
 
 
 from flask_migrate import Migrate
-from static.globalDto import Audit, Comment, Like, Post, Register
+from static.globalDto import Audit, Comment, Like, Post, Register, SysSettingDto
 
 app = Flask(__name__)
 # 绑定配置文件
@@ -33,12 +34,21 @@ app.register_blueprint(f_bp)
 app.register_blueprint(uc_bp)
 app.register_blueprint(ma_bp)
 app.register_blueprint(mb_bp)
+app.register_blueprint(ss_bp)
+app.register_blueprint(mui_bp)
+app.register_blueprint(mds_bp)
+
 
 db.init_app(app)
 migrate = Migrate(app, db)
 mail.init_app(app)
+cache.init_app(app)
 
 with app.app_context():
+    system_settings = SysSetting.query.all()  # 从数据库中获取系统设置数据
+    for setting in system_settings:
+        cache.set(setting.code, json.loads(setting.json_content))  # 将数据放入缓存
+
     @app.before_request
     def my_before_request():
         # 注册设置
@@ -49,7 +59,7 @@ with app.app_context():
         # 评论设置
         syssetting = SysSetting.query.filter_by(code="comment").first()
         comment_dict = json.loads(syssetting.json_content)
-        comment = Comment(comment_dict.get("commentDayCountThreshold"), comment_dict.get("commentIntegral"),
+        comment = Comment(comment_dict.get("commentDayCountThreshold"),
                           comment_dict.get("commentOpen"))
         setattr(g, "commentInfo", comment)
         # 审核
@@ -60,7 +70,8 @@ with app.app_context():
         # 附件
         syssetting = SysSetting.query.filter_by(code="post").first()
         post_dict = json.loads(syssetting.json_content)
-        post = Post(post_dict.get("attachmentSize"), post_dict.get("dayImageUploadCount"),post_dict.get("postDayCountThreshold"))
+        post = Post(post_dict.get("attachmentSize"), post_dict.get("dayImageUploadCount"),
+                    post_dict.get("postDayCountThreshold"))
         setattr(g, "postInfo", post)
 
         # 点赞
@@ -69,11 +80,12 @@ with app.app_context():
         like = Like(like_dict.get("likeDayCountThreshold"))
         setattr(g, "likeInfo", like)
 
+
 @app.errorhandler(500)
 def code_500_error(error):
     error_message = {
         'code': 500,
-        'error':error.description,
+        'error': error.description,
         'info': ' 服务器返回错误',
     }
     return jsonify(error_message), 500
@@ -98,20 +110,16 @@ def code_600_error(error):
     }
     return jsonify(error_message)
 
+
 @app.errorhandler(422)
 def code_500_error(error):
     error_message = {
         'code': 422,
-        'error':error.description,
+        'error': error.description,
         'info': '数据库操作失败',
     }
     return jsonify(error_message), 422
 
-
-# @app.context_processor
-# # 上下文处理器,每个模板中都会有user
-# def my_context_processor():
-#     return {"user": g.user}
 
 
 if __name__ == '__main__':
