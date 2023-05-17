@@ -24,9 +24,9 @@ def uploadImage():
     file.save(config.IMAGE_PATH + config.TEMP_FOLDER + '/' + filename)
     if g.auditInfo.getPostAudit():
         if not image_audit(config.IMAGE_PATH + config.TEMP_FOLDER + '/' + filename):
-            abort(400,description="图片违规，请选择合法图片")
+            abort(400, description="图片违规，请选择合法图片")
     result = {
-        'filename': config.TEMP_FOLDER + "/" + filename
+        'fileName': config.TEMP_FOLDER + "/" + filename
     }
     # 读取文件数据
     return SuccessResponse(data=result)
@@ -37,12 +37,13 @@ def allowed_file(filename):
         filename.rsplit('.', 1)[1] in globalinfoEnum.IMAGE_SUFFIX.value
 
 
-@bp.route("/getImage/<imageFolder>/<imageName>", methods=['GET', 'POST'])
+@bp.route("/getImage/<imageFolder>/<imageName>", methods=['GET'])
 def getImage(imageFolder, imageName):
-    if request.method == 'GET' or request.method == 'POST':
+    if request.method == 'GET' :
         filepath = config.IMAGE_PATH + '/' + imageFolder + '/' + imageName
         if not os.path.exists(filepath):
-            abort(404, description="文件不存在")
+            filepath = config.IMAGE_PATH + '/EasyTalk.png'
+            # abort(400)
         # 检测图片格式
         with open(filepath, 'rb') as f:
             data = f.read(16)

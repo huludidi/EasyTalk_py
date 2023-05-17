@@ -18,6 +18,7 @@ from blueprints.ManageBoard import bp as mb_bp
 from blueprints.SysSetting import bp as ss_bp
 from blueprints.ManageUserInfo import bp as mui_bp
 from blueprints.ManageDataShow import bp as mds_bp
+from blueprints.School import bp as s_bp
 
 
 from flask_migrate import Migrate
@@ -37,6 +38,7 @@ app.register_blueprint(mb_bp)
 app.register_blueprint(ss_bp)
 app.register_blueprint(mui_bp)
 app.register_blueprint(mds_bp)
+app.register_blueprint(s_bp)
 
 
 db.init_app(app)

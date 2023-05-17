@@ -16,7 +16,7 @@ bp = Blueprint("ForumBoard", __name__, url_prefix="/board")
 
 @bp.route("/loadBoard", methods=['POST'])
 def loadBoard():
-    formboardinfo = ForumBoard.query.filter_by(post_type=1).order_by('sort').all()
+    formboardinfo = ForumBoard.query.order_by('sort').all()
     formboardinfoList = []
     for item in formboardinfo:
         formboardinfoList.append(item.to_dict())

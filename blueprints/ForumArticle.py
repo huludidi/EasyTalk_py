@@ -80,6 +80,16 @@ def loadArticle():
     filterType = request.values.get('filterType')  # 0:与我同校 1:与我同城
     pageNo = request.values.get('pageNo')
     userinfo = session.get('userInfo')
+    if boardId == '':
+        boardId = None
+    if pBoardId == '':
+        pBoardId = None
+    if orderType == '':
+        orderType = None
+    if filterType == '':
+        filterType = None
+    if not pageNo:
+        pageNo = 1
     forumarticle = ForumArticle()
     data = forumarticle.searchlist(userinfo=userinfo, p_board_id=pBoardId, board_id=boardId, orderType=orderType,
                                    filterType=filterType, pageNo=pageNo)
@@ -104,6 +114,8 @@ def getArticleDetail():
     if article.attachment_type:
         attachment = ForumArticleAttachment.query.filter_by(article_id=article.article_id).first()
         result['attachment'] = attachment.to_dict()
+    else:
+        result['attachment']=None
     # 是否已点赞
     if session.get('userInfo'):
         likerecord = LikeRecord.query.filter_by(
@@ -111,6 +123,8 @@ def getArticleDetail():
             op_type=globalinfoEnum.ARTICLE_LIKE.value).first()
         if likerecord:
             result['haveLike'] = True
+        else:
+            result['haveLike']=False
     db.session.commit()
     article.post_time = article.post_time.strftime('%Y-%m-%d %H:%M:%S')
     article.last_update_time = article.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -131,7 +145,7 @@ def doLike():
     return SuccessResponse()
 
 
-@bp.route("/attachmentDownload", methods=['POST'])
+@bp.route("/attachmentDownload")
 @login_required
 @check_params
 def attachmentDownload():
@@ -154,7 +168,7 @@ def attachmentDownload():
         db.session.commit()
         filename = file.file_name
         filename = filename.encode("utf-8").decode("latin1")  # 编码转换
-        response = make_response(send_file(file.file_path))
+        response = make_response(send_file(config.FILE_PATH+'/'+config.ATTACHMENT_FOLDER+'/'+file.file_path))
         response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
         return response
 

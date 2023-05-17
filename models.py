@@ -57,75 +57,76 @@ class ForumArticle(db.Model):
 
     def searchlist(self, userinfo=None, p_board_id=None, board_id=None, orderType=None, filterType=None, pageNo=None):
         # try:
-            ForumArticle.__mapper_args__['exclude_properties'] = ['markdown_content', 'content']
-            condition = {}
-            if p_board_id:
-                condition['p_board_id'] = p_board_id
-            if board_id:
-                condition['board_id'] = board_id
+        ForumArticle.__mapper_args__['exclude_properties'] = ['markdown_content', 'content']
+        condition = {}
+        if p_board_id:
+            condition['p_board_id'] = p_board_id
+        if board_id:
+            condition['board_id'] = board_id
 
-            # 查询数据
-            articles = db.session.query(ForumArticle).filter_by(**condition)
-            # 对内容进行排序
-            if orderType :
-                if orderType == '0':  # 点赞最多
-                    articles = articles.order_by(ForumArticle.good_count.desc())
-                elif orderType == '1':  # 评论最多
-                    articles = articles.order_by(ForumArticle.comment_count.desc())
-            else:
-                articles = articles.order_by(ForumArticle.post_time.desc())
-            # 对内容进行筛选
-            if userinfo and filterType:
-                if filterType == '0':
-                    if userinfo.get('school') == None:
-                        abort(400,description="请用户绑定学校")
-                    else:
-                        articles = articles.filter(ForumArticle.author_school == userinfo.get('school'))
-                elif filterType == '1':
-                    if json.loads(userinfo.get('lastLoginIpAddress')).get('region') == '未知':
-                        abort(400,description="无法定位用户位置")
-                    else:
-                        articles = articles.filter(ForumArticle.author_ip_address == userinfo.get('lastLoginIpAddress'))
-            # 查询数据总数
-            total_count=articles.count()
-            # 计算分页参数
-            start_index = (int(pageNo) - 1) * globalinfoEnum.PageSize.value
-            end_index = start_index + globalinfoEnum.PageSize.value
-            # 设置分页信息
-            articles = articles.slice(start_index, end_index)
+        # 查询数据
+        articles = db.session.query(ForumArticle).filter_by(**condition)
+        articles = articles.filter(ForumArticle.status == 1, ForumArticle.audit == 1)
+        # 对内容进行排序
+        if orderType:
+            if orderType == '0':  # 点赞最多
+                articles = articles.order_by(ForumArticle.good_count.desc())
+            elif orderType == '1':  # 评论最多
+                articles = articles.order_by(ForumArticle.comment_count.desc())
+        else:
+            articles = articles.order_by(ForumArticle.post_time.desc())
+        # 对内容进行筛选
+        if userinfo and filterType:
+            if filterType == '0':
+                if userinfo.get('school') == None:
+                    abort(400, description="请用户绑定学校")
+                else:
+                    articles = articles.filter(ForumArticle.author_school == userinfo.get('school'))
+            elif filterType == '1':
+                if json.loads(userinfo.get('lastLoginIpAddress')).get('region') == '未知':
+                    abort(400, description="无法定位用户位置")
+                else:
+                    articles = articles.filter(ForumArticle.author_ip_address == userinfo.get('lastLoginIpAddress'))
+        # 查询数据总数
+        total_count = articles.count()
+        # 计算分页参数
+        start_index = (int(pageNo) - 1) * globalinfoEnum.PageSize.value
+        end_index = start_index + globalinfoEnum.PageSize.value
+        # 设置分页信息
+        articles = articles.slice(start_index, end_index)
 
-            # 将内容转换为字典列表
-            result = []
-            for article in articles:
-                result.append({
-                    'articleId': article.article_id,
-                    'boardId': article.board_id,
-                    'boardName': article.board_name,
-                    'pBoardId': article.p_board_id,
-                    'pBoardName': article.p_board_name,
-                    'authorId': article.author_id,
-                    'nickName': article.nick_name,
-                    'authorSchool': article.author_school,
-                    'authorIpAddress': article.author_ip_address,
-                    'title': article.title,
-                    'cover': article.cover,
-                    'summary': article.summary,
-                    'postTime': article.post_time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'lastUpdateTime': article.last_update_time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'readCount': article.read_count,
-                    'goodCount': article.good_count,
-                    'commentCount': article.comment_count,
-                    'topType': article.top_type,
-                    'status': article.status,
-                    'audit':article.audit
-                })
-            return {
-                'totalCount': total_count,
-                'pageNo': pageNo,
-                'pageSize': globalinfoEnum.PageSize.value,
-                'pageTotal': ceil(total_count / globalinfoEnum.PageSize.value),
-                'list': result
-            }
+        # 将内容转换为字典列表
+        result = []
+        for article in articles:
+            result.append({
+                'articleId': article.article_id,
+                'boardId': article.board_id,
+                'boardName': article.board_name,
+                'pBoardId': article.p_board_id,
+                'pBoardName': article.p_board_name,
+                'authorId': article.author_id,
+                'nickName': article.nick_name,
+                'authorSchool': article.author_school,
+                'authorIpAddress': article.author_ip_address,
+                'title': article.title,
+                'cover': article.cover,
+                'summary': article.summary,
+                'postTime': article.post_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'lastUpdateTime': article.last_update_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'readCount': article.read_count,
+                'goodCount': article.good_count,
+                'commentCount': article.comment_count,
+                'topType': article.top_type,
+                'status': article.status,
+                'audit': article.audit
+            })
+        return {
+            'totalCount': total_count,
+            'pageNo': pageNo,
+            'pageSize': globalinfoEnum.PageSize.value,
+            'pageTotal': ceil(total_count / globalinfoEnum.PageSize.value),
+            'list': result
+        }
 
 
 class ForumArticleAttachment(db.Model):
@@ -189,11 +190,12 @@ class ForumComment(db.Model):
     top_type = db.Column(db.Boolean, index=True, server_default=text('0'), comment='0:未置顶  1:置顶')
     post_time = db.Column(db.DateTime, index=True, comment='发布时间')
     good_count = db.Column(db.Integer, server_default=text('0'), comment='good数量')
-    status = db.Column(db.Integer,server_default=text('0'), index=True, comment='0:待审核  1:已审核')
+    status = db.Column(db.Integer, server_default=text('0'), index=True, comment='0:待审核  1:已审核')
     audit = db.Column(db.Boolean, index=True, comment='0:审核通过  1:审核未通过')
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 
 class LikeRecord(db.Model):
     __tablename__ = 'like_record'
@@ -210,7 +212,7 @@ class LikeRecord(db.Model):
     create_time = db.Column(db.DateTime, comment='发布时间')
     author_user_id = db.Column(db.String(15), comment='主体作者ID')
 
-    def dolike(self,objectid,optype,userid):
+    def dolike(self, objectid, optype, userid):
         try:
             usermessage = UserMessage()
             # 文章点赞
@@ -285,6 +287,7 @@ class LikeRecord(db.Model):
             db.session.rollback()
             abort(422)
 
+
 class SysSetting(db.Model):
     __tablename__ = 'sys_setting'
     __table_args__ = {'comment': '系统设置信息'}
@@ -313,6 +316,7 @@ class UserInfo(db.Model):
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 
 class UserIntegralRecord(db.Model):
     __tablename__ = 'user_integral_record'
@@ -347,14 +351,16 @@ class UserMessage(db.Model):
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
+
 class SchoolInfo(db.Model):
     __tablename__ = 'school_info'
 
-    id = db.Column(db.Integer,primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     ch_name = db.Column(db.String(255))
     en_name = db.Column(db.String(255))
     longitude = db.Column(db.String(255))
     latitude = db.Column(db.String(255))
+    cover = db.Column(db.String(255))
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

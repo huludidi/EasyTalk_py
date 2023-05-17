@@ -14,14 +14,14 @@ from blueprints.forms import RegisterForm, LoginForm, ResetPwdForm
 from decorators import check_params
 from exts import db, mail
 from models import UserInfo, EmailCode, UserMessage
-from functions import CustomResponse
+from functions import CustomResponse, SuccessResponse
 from static.enums import MessageTypeEnum
 from static.globalDto import ADMIN_EMAIL
 
 bp = Blueprint("LoginAndRegister", __name__, url_prefix="/")
 
 
-@bp.route("/checkCode", methods=['POST'])
+@bp.route("/checkCode")
 def imagecaptcha():
     characters = string.ascii_letters + string.digits
     result_str = ''.join(random.choice(characters) for i in range(5))
@@ -108,7 +108,6 @@ def register():
         abort(400)
 
 
-
 @bp.route("/login", methods=['POST'])
 @check_params
 def login():
@@ -162,7 +161,7 @@ def login():
             else:
                 session_userInfo['isAdmin'] = False
             session['userInfo'] = session_userInfo
-            return CustomResponse(code=200).to_dict()
+            return SuccessResponse(data=session_userInfo)
     else:
         print(form.errors)
         abort(400)
@@ -172,7 +171,7 @@ def login():
 @check_params
 def getuserinfo():
     userinfo = None
-    if session['userInfo']:
+    if session.get('userInfo'):
         userinfo = session['userInfo']
     return CustomResponse(code=200, data=userinfo).to_dict()
 
@@ -192,33 +191,29 @@ def getsyssetting():
 def resetpassword():
     form = ResetPwdForm(request.form)
     if form.validate():
-        try:
-            email = form.email.data
-            password = form.password.data
-            checkCode = form.checkCode.data
-            emailCode = form.emailCode.data
-            # 验证验证码是否正确
-            sessionCheckcode = session.get('checkCode')
-            if checkCode.lower() != sessionCheckcode.lower():
-                abort(400, description="验证码错误")
-            user = UserInfo.query.filter_by(email=email).first()
-            if not user:
-                abort(400, description="邮箱不存在")
-            #  检查邮箱验证码
-            dbInfo = EmailCode.query.get((email, emailCode))
-            if dbInfo is None:
-                abort(400, description="邮箱验证码不正确")
-            if dbInfo.status != 0 or (datetime.now() - dbInfo.create_time).seconds > 900:
-                abort(400, description="邮箱验证码已失效")
-            dbInfo.status = 1
-            db.session.commit()
-            # 更新密码
-            user.password = generate_password_hash(password)
-            db.session.commit()
-        finally:
-            session.pop('checkCode')
-            return CustomResponse(code=200).to_dict()
+        email = form.email.data
+        password = form.password.data
+        checkCode = form.checkCode.data
+        emailCode = form.emailCode.data
+        # 验证验证码是否正确
+        sessionCheckcode = session.get('checkCode')
+        if checkCode.lower() != sessionCheckcode.lower():
+            abort(400, description="验证码错误")
+        user = UserInfo.query.filter_by(email=email).first()
+        if not user:
+            abort(400, description="邮箱不存在")
+        #  检查邮箱验证码
+        dbInfo = EmailCode.query.get((email, emailCode))
+        if dbInfo is None:
+            abort(400, description="邮箱验证码不正确")
+        if dbInfo.status != 0 or (datetime.now() - dbInfo.create_time).seconds > 900:
+            abort(400, description="邮箱验证码已失效")
+        dbInfo.status = 1
+        # 更新密码
+        user.password = generate_password_hash(password)
+        db.session.commit()
+        session.pop('checkCode')
+        return CustomResponse(code=200).to_dict()
     else:
         print(form.errors)
-        abort(400)
-
+        abort(400, description=form.errors)

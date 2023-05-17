@@ -18,12 +18,14 @@ bp = Blueprint("Ucenter", __name__, url_prefix="/ucenter")
 def getUserInfo():
     userid = request.values.get('userId')
     user = UserInfo.query.filter_by(user_id=userid).first()
-    current_user = session['userInfo']
     if not user or user.status == 0:
-        abort(404)
+        abort(404,description="该用户已被禁用")
     #     获取用户文章
-    article = ForumArticle.query.filter_by(author_id=user.user_id).all()
-    article = article.filter_by(status=1, audit=1)
+    article = ForumArticle.query.filter_by(author_id=user.user_id)
+    article = article.filter_by(status=1, audit=1).all()
+    readcount = 0
+    for item in article:
+        readcount += item.read_count
     postcount = len(article)  # 文章数量
 
     likecord = LikeRecord.query.filter_by(author_user_id=user.user_id).all()
@@ -36,6 +38,7 @@ def getUserInfo():
         'personDescription': user.person_description,
         'joinTime': user.join_time.strftime('%Y-%m-%d'),
         'lastLoginTime': user.last_login_time.strftime('%Y-%m-%d'),
+        'readCount': readcount,
         'postCount': postcount,
         'likeCount': likecount,
         'school': user.school
