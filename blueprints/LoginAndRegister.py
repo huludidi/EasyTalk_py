@@ -151,6 +151,7 @@ def login():
             db.session.commit()
             # 保存在session中
             session_userInfo = {
+                'schoolEmail': userinfo.school_email,
                 'school': userinfo.school,
                 'nickName': userinfo.nick_name,
                 'lastLoginIpAddress': userinfo.last_login_ip_address,

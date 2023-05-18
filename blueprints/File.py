@@ -39,7 +39,7 @@ def allowed_file(filename):
 
 @bp.route("/getImage/<imageFolder>/<imageName>", methods=['GET'])
 def getImage(imageFolder, imageName):
-    if request.method == 'GET' :
+    if request.method == 'GET':
         filepath = config.IMAGE_PATH + '/' + imageFolder + '/' + imageName
         if not os.path.exists(filepath):
             filepath = config.IMAGE_PATH + '/EasyTalk.png'
@@ -63,11 +63,10 @@ def getImage(imageFolder, imageName):
         return response
 
 
-@bp.route("/getAvatar/<userId>", methods=['GET', 'POST'])
+@bp.route("/getAvatar/<userId>")
 def getavatar(userId):
-    if request.method == 'GET' or request.method == 'POST':
-        filepath = config.IMAGE_PATH + config.AVATAR_FOLDER + '/' + userId + '.jpg'
-        if not os.path.exists(filepath):
-            filepath = config.IMAGE_PATH + config.AVATAR_FOLDER + '/' + 'default_avatar.jpg'
-        response = make_response(send_file(filepath, mimetype="imaga/jpg"))
-        return response
+    filepath = config.IMAGE_PATH + config.AVATAR_FOLDER + '/' + userId + '.jpg'
+    if not os.path.exists(filepath):
+        filepath = config.IMAGE_PATH + config.AVATAR_FOLDER + '/' + 'default_avatar.jpg'
+    response = make_response(send_file(filepath, mimetype="imaga/jpg"))
+    return response

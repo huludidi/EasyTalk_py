@@ -24,7 +24,7 @@ def loadArticle():
     if not pageno:
         pageno = 1
     ordertype = request.values.get('orderType')  # 0:最新 1:最热
-    userinfo = session['userInfo']
+    userinfo = session.get("userInfo")
     if not g.commentInfo.getcommentOpen():
         abort(500, description="未开启评论")
     # 查询数据总数
@@ -41,13 +41,13 @@ def loadArticle():
     comments = comments.paginate(page=int(pageno), per_page=per_page, error_out=False).items
     pcomment_list = []
     for item in comments:
-        like = LikeRecord.query \
-            .filter_by(object_id=item.comment_id, user_id=userinfo.get('userId'), op_type=1) \
-            .first()
-        if like:
-            haveliked = 1
-        else:
-            haveliked = 0
+        haveliked = 0
+        if userinfo:
+            like = LikeRecord.query \
+                .filter_by(object_id=item.comment_id, user_id=userinfo.get('userId'), op_type=1) \
+                .first()
+            if like:
+                haveliked = 1
         user = UserInfo.query.filter_by(user_id=item.user_id).first()
         item.post_time = item.post_time.strftime('%Y-%m-%d %H:%M:%S')
         dictitem = item.to_dict()
@@ -71,13 +71,13 @@ def get_comments(pcomment_list, userinfo, articleid):
     childrenlist = {}
     result = []
     for item in comments:
-        like = LikeRecord.query \
-            .filter_by(object_id=item.comment_id, user_id=userinfo.get('userId'), op_type=1) \
-            .first()
-        if like:
-            haveliked = 1
-        else:
-            haveliked = 0
+        haveliked = 0
+        if userinfo:
+            like = LikeRecord.query \
+                .filter_by(object_id=item.comment_id, user_id=userinfo.get('userId'), op_type=1) \
+                .first()
+            if like:
+                haveliked = 1
         item.post_time = item.post_time.strftime('%Y-%m-%d %H:%M:%S')
         dictitem = item.to_dict()
         user = UserInfo.query.filter_by(user_id=item.user_id).first()

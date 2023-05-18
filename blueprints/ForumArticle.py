@@ -53,8 +53,12 @@ def uploadAttachment(article, forumattachment, file, isupload):
         attachment = ForumArticleAttachment.query.filter_by(article_id=article.article_id).first()
         # 若修改了附件，先删除原文件
         if attachment:
-            new_attachment = attachment
-            os.remove(config.FILE_PATH + '/' + config.ATTACHMENT_FOLDER + '/' + attachment.file_path)
+            try:
+                new_attachment = attachment
+                os.remove(config.FILE_PATH + '/' + config.ATTACHMENT_FOLDER + '/' + attachment.file_path)
+            except Exception as e:
+                print(e)
+                abort(500)
 
     fileuploadDto = uploadFile2Local(file, config.ATTACHMENT_FOLDER, FileUploadTypeEnum.ARTICLE_ATTACHMENT)
     if not new_attachment:
@@ -115,7 +119,7 @@ def getArticleDetail():
         attachment = ForumArticleAttachment.query.filter_by(article_id=article.article_id).first()
         result['attachment'] = attachment.to_dict()
     else:
-        result['attachment']=None
+        result['attachment'] = None
     # 是否已点赞
     if session.get('userInfo'):
         likerecord = LikeRecord.query.filter_by(
@@ -124,7 +128,7 @@ def getArticleDetail():
         if likerecord:
             result['haveLike'] = True
         else:
-            result['haveLike']=False
+            result['haveLike'] = False
     db.session.commit()
     article.post_time = article.post_time.strftime('%Y-%m-%d %H:%M:%S')
     article.last_update_time = article.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -168,7 +172,7 @@ def attachmentDownload():
         db.session.commit()
         filename = file.file_name
         filename = filename.encode("utf-8").decode("latin1")  # 编码转换
-        response = make_response(send_file(config.FILE_PATH+'/'+config.ATTACHMENT_FOLDER+'/'+file.file_path))
+        response = make_response(send_file(config.FILE_PATH + '/' + config.ATTACHMENT_FOLDER + '/' + file.file_path))
         response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
         return response
 
@@ -193,12 +197,12 @@ def postArticle():
     cover = request.files.get('cover')  # 封面
     attachment = request.files.get('attachment')  # 附件
     title = request.values.get('title')  # 标题
-    pboardid = request.values.get('pBoardId')
-    boardid = request.values.get('boardId')
+    pboardid = request.values.get('p_board_id')
+    boardid = request.values.get('board_id')
     summary = request.values.get('summary')  # 摘要
-    editortype = request.values.get('editorType')
+    editortype = request.values.get('editor_type')
     content = request.values.get('content')
-    markdowncontent = request.values.get('markdownContent')
+    markdowncontent = request.values.get('markdown_content')
     userinfo = session['userInfo']
     # 参数判断
     if not title or len(title) > 150:
@@ -227,9 +231,15 @@ def postArticle():
     forumarticle.author_ip_address = userinfo.get('lastLoginIpAddress')
     # 附件信息
     forumattachment = ForumArticleAttachment(user_id=userinfo.get('userId'))
-    post(forumarticle, forumattachment, cover, attachment, userinfo.get('isAdmin'))
+    contentaudit, imageaudit = post(forumarticle, forumattachment, cover, attachment, userinfo.get('isAdmin'))
     db.session.commit()
-    return SuccessResponse(data=forumarticle.article_id)
+    result = {
+        "contentaudit": contentaudit,
+        "imageaudit": imageaudit,
+        "audit": forumarticle.audit,
+        "article_id": forumarticle.article_id
+    }
+    return SuccessResponse(data=result)
 
 
 # 文章上传
@@ -259,9 +269,10 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
             forumarticle.attachment_type = 0
         # 文章审核
         forumarticle.status = 1
+        contentaudit = True
+        imageaudit = True
         if g.auditInfo.getPostAudit():
             contentaudit = textAudit(forumarticle.content)
-            imageaudit = True
             if cover:
                 imageaudit = image_audit(config.IMAGE_PATH + '/' + forumarticle.cover)
             if contentaudit and imageaudit:
@@ -284,8 +295,8 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
             if markdowncontent:
                 markdowncontent = markdowncontent.replace('/temp/', replacemonth)
                 forumarticle.markdown_content = markdowncontent
-
         db.session.add(forumarticle)
+        return contentaudit, imageaudit
     except Exception as e:
         print(e)
         abort(422)
@@ -317,29 +328,33 @@ def articleDetail4Update():
     article = ForumArticle.query.filter_by(article_id=articleid).first()
     attachment = None
     if not article or userinfo.get('userId') != article.author_id:
-        abort(400)
+        abort(400, description="只有作者可以编辑文章")
     if article.attachment_type == 1:
         attachment = ForumArticleAttachment.query.filter_by(article_id=article.article_id).first()
     result = {}
     article.post_time = article.post_time.strftime('%Y-%m-%d %H:%M:%S')
     result['forumArticle'] = article.to_dict()
-    result['attachment'] = attachment.to_dict()
+    if attachment:
+        result['attachment'] = attachment.to_dict()
+    else:
+        result['attachment'] = None
+
     return SuccessResponse(data=result)
 
 
 @bp.route("/updateArticle", methods=['POST'])
 def updateArticle():
-    articleid = request.values.get('articleId')
-    attachmenttype = request.values.get('attachmentType')
+    articleid = request.values.get('article_id')
+    attachmenttype = request.values.get('attachment_type')
     cover = request.files.get('cover')  # 封面
     attachment = request.files.get('attachment')  # 附件
     title = request.values.get('title')  # 标题
-    pboardid = request.values.get('pBoardId')
-    boardid = request.values.get('boardId')
+    pboardid = request.values.get('p_board_id')
+    boardid = request.values.get('board_id')
     summary = request.values.get('summary')  # 摘要
-    editortype = request.values.get('editorType')
+    editortype = request.values.get('editor_type')
     content = request.values.get('content')
-    markdowncontent = request.values.get('markdownContent')
+    markdowncontent = request.values.get('markdown_content')
     userinfo = session['userInfo']
     # 参数判断
     if not title or len(title) > 150:
@@ -376,7 +391,7 @@ def updateArticle():
 
     update(forumarticle, forumattachment, cover, attachment, userinfo.get('isAdmin'))
     db.session.commit()
-    return SuccessResponse(data=forumarticle.to_dict())
+    return SuccessResponse(data=forumarticle.article_id)
 
 
 def update(forumarticle, forumattachment, cover, attachment, isadmin):
@@ -425,24 +440,29 @@ def update(forumarticle, forumattachment, cover, attachment, isadmin):
 @bp.route("/search", methods=['POST'])
 def search():
     keyword = request.values.get('keyword')
-    if len(keyword) < 3:
+    pageNo = request.values.get('pageNo')
+    if not pageNo:
+        pageNo = 1
+    else:
+        pageNo = int(pageNo)
+    if len(keyword) < 2:
         abort(400, description="请求参数过短")
     result = {
         'totalCount': 0,
         'pageNo': 1,
-        'pageSize': globalinfoEnum.PageSize.value,
+        'pageSize': 7,
         'pageTotal': 0,
         'list': []
     }
     # 根据标题模糊查询文章
     articles = ForumArticle.query \
-        .filter(ForumArticle.title.like(f'%{keyword}%'))
+        .filter(ForumArticle.title.like(f'%{keyword}%'), ForumArticle.audit == 1)
     total = articles.count()
-    articles = articles.paginate(page=1, per_page=globalinfoEnum.PageSize.value).items
+    articles = articles.paginate(page=pageNo, per_page=7).items
     for item in articles:
         item.post_time = item.post_time.strftime('%Y-%m-%d %H:%M:%S')
         item.last_update_time = item.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
         result['list'].append(item.to_dict())
     result['totalCount'] = total
-    result['pageTotal'] = ceil(total / globalinfoEnum.PageSize.value)
+    result['pageTotal'] = ceil(total / 7)
     return SuccessResponse(data=result)

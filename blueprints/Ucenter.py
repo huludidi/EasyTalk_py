@@ -19,7 +19,7 @@ def getUserInfo():
     userid = request.values.get('userId')
     user = UserInfo.query.filter_by(user_id=userid).first()
     if not user or user.status == 0:
-        abort(404,description="该用户已被禁用")
+        abort(404, description="该用户已被禁用")
     #     获取用户文章
     article = ForumArticle.query.filter_by(author_id=user.user_id)
     article = article.filter_by(status=1, audit=1).all()
@@ -41,21 +41,25 @@ def getUserInfo():
         'readCount': readcount,
         'postCount': postcount,
         'likeCount': likecount,
-        'school': user.school
+        'school': user.school,
+        'schoolEmail': user.school_email
     }
     return SuccessResponse(data=result)
 
 
 @bp.route("/loadUserArticle", methods=['POST'])
-@check_params
 def loadUserArticle():
     userid = request.values.get('userId')
     type = request.values.get('type')
-    page = int(request.values.get('pageNo'))
-    userinfo = session['userInfo']
+    page = request.values.get('pageNo')
+    if not page:
+        page = 1
+    else:
+        page = int(page)
+    userinfo = session.get("userInfo")
     user = UserInfo.query.filter_by(user_id=userid).first()
     list = []
-    result = {"pageSize": globalinfoEnum.PageSize.value, "pageNo": page}
+    result = {"pageSize": 10, "pageNo": page}
     totalCount = 0
     if not user or user.status == 0:
         abort(404)
@@ -65,18 +69,18 @@ def loadUserArticle():
             .filter_by(author_id=userid) \
             .order_by(ForumArticle.post_time.desc())
         # 若非本用户，只能看审核通过的文章
-        if userinfo['userId'] != userid:
+        if not userinfo or userinfo['userId'] != userid:
             articles = articles.filter_by(status=1, audit=1)
         totalCount = len(articles.all())
         #     分页
-        articles = articles.paginate(page=page, per_page=globalinfoEnum.PageSize.value, error_out=False).items
+        articles = articles.paginate(page=page, per_page=10, error_out=False).items
         # 加入list
         for item in articles:
             item.post_time = item.post_time.strftime('%Y-%m-%d %H:%M:%S')
             item.last_update_time = item.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
             list.append(item.to_dict())
         result['totalCount'] = totalCount
-        result['pageTotal'] = ceil(totalCount / globalinfoEnum.PageSize.value)
+        result['pageTotal'] = ceil(totalCount / 10)
         result['list'] = list
     # 评论过的文章
     elif type == '1':
@@ -86,13 +90,13 @@ def loadUserArticle():
         # 查询所有被评论过的文章
         articles = ForumArticle.query.filter(ForumArticle.article_id.in_(commented_article_ids))
         totalCount = len(articles.all())
-        articles = articles.paginate(page=page, per_page=globalinfoEnum.PageSize.value, error_out=False).items
+        articles = articles.paginate(page=page, per_page=10, error_out=False).items
         for item in articles:
             item.post_time = item.post_time.strftime('%Y-%m-%d %H:%M:%S')
             item.last_update_time = item.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
             list.append(item.to_dict())
         result['totalCount'] = totalCount
-        result['pageTotal'] = ceil(totalCount / globalinfoEnum.PageSize.value)
+        result['pageTotal'] = ceil(totalCount / 10)
         result['list'] = list
     # 点赞过的文章
     elif type == '2':
@@ -102,20 +106,19 @@ def loadUserArticle():
         # 查询所有被评论过的文章
         articles = ForumArticle.query.filter(ForumArticle.article_id.in_(liked_article_ids))
         totalCount = len(articles.all())
-        articles = articles.paginate(page=page, per_page=globalinfoEnum.PageSize.value, error_out=False).items
+        articles = articles.paginate(page=page, per_page=10, error_out=False).items
         for item in articles:
             item.post_time = item.post_time.strftime('%Y-%m-%d %H:%M:%S')
             item.last_update_time = item.last_update_time.strftime('%Y-%m-%d %H:%M:%S')
             list.append(item.to_dict())
         result['totalCount'] = totalCount
-        result['pageTotal'] = ceil(totalCount / globalinfoEnum.PageSize.value)
+        result['pageTotal'] = ceil(totalCount / 10)
         result['list'] = list
     return SuccessResponse(data=result)
 
 
 @bp.route("/updateUserInfo", methods=['POST'])
 @login_required
-@check_params
 def updateUserInfo():
     form = UpdateForm(request.form)
     if form.validate():
@@ -134,6 +137,7 @@ def updateUserInfo():
 
         if avatar:
             uploadFile2Local(avatar, userinfo['userId'], FileUploadTypeEnum.AVATAR)
+        db.session.commit()
         return SuccessResponse()
     else:
         print(form.errors)
@@ -142,7 +146,16 @@ def updateUserInfo():
 
 @bp.route("/getMessageCount", methods=['POST'])
 def getMessageCount():
-    userinfo = session['userInfo']
+    userinfo = session.get("userInfo")
+    result = {
+        "total": 0,
+        "sys": 0,
+        "reply": 0,
+        "likePost": 0,
+        "likeComment": 0,
+    }
+    if not userinfo:
+        return SuccessResponse(data=result)
     total = UserMessage.query.filter_by(status=1, received_user_id=userinfo['userId']).count()
     unread_counts = db.session.query(
         UserMessage.message_type,
@@ -153,13 +166,7 @@ def getMessageCount():
     ).group_by(
         UserMessage.message_type
     ).all()
-    result = {
-        "total": 0,
-        "sys": 0,
-        "reply": 0,
-        "likePost": 0,
-        "likeComment": 0,
-    }
+
     for message_type, count in unread_counts:
         message_type_obj = MessageTypeEnum.getByType(message_type)
         if message_type_obj:
@@ -169,15 +176,20 @@ def getMessageCount():
 
 
 @bp.route("/loadMessageList", methods=['POST'])
-@check_params
 def loadMessageList():
     code = request.values.get('code')
-    pageNo = int(request.values.get('pageNo'))
+    if not code:
+        abort(400)
+    pageNo = request.values.get('pageNo')
+    if not pageNo:
+        pageNo = 1
+    else:
+        pageNo = int(pageNo)
     typeEnum = MessageTypeEnum.getByCode(code)
     userinfo = session['userInfo']
     result = {
         'totalCount': 0,
-        'pageSize': globalinfoEnum.PageSize.value,
+        'pageSize': 10,
         'pageNo': pageNo,
         'pageTotal': 0,
         'list': []
@@ -185,10 +197,9 @@ def loadMessageList():
     totalCount = 0
     if not typeEnum:
         abort(400)
-    if not pageNo or pageNo == 1:
-        UserMessage.query \
-            .filter_by(received_user_id=userinfo['userId'], message_type=typeEnum.value.get('type'), status=1) \
-            .update({UserMessage.status: 2})
+    UserMessage.query \
+        .filter_by(received_user_id=userinfo['userId'], message_type=typeEnum.value.get('type'), status=1) \
+        # .update({UserMessage.status: 2})
 
     usermessage = UserMessage.query \
         .filter_by(received_user_id=userinfo['userId'], message_type=typeEnum.value.get('type')) \

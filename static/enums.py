@@ -33,7 +33,7 @@ class MessageTypeEnum(Enum):
     COMMENT = {"type": 1, "code": "reply", "desc": "回复我的"}
     ARTICLE_LIKE = {"type": 2, "code": "likePost", "desc": "攒了我的文章"}
     COMMENT_LIKE = {"type": 3, "code": "likeComment", "desc": "赞了我的评论"}
-    ATTACHMENT_DOWNLOAD = {"type": 4, "code": "attachmentdownload", "desc": "下载了附件"}
+    ATTACHMENT_DOWNLOAD = {"type": 4, "code": "attachmentDownload", "desc": "下载了附件"}
 
     @classmethod
     def getByType(cls, Type):

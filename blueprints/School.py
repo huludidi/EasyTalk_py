@@ -10,17 +10,30 @@ from models import SchoolInfo, ForumArticle
 
 bp = Blueprint("School", __name__, url_prefix="/school")
 
+@bp.route('/getSchoolInfo', methods=['POST'])
+def getSchoolInfo():
+    schools = SchoolInfo.query.all()
+    result = []
+    for item in schools:
+        result.append(item.to_dict())
+    return SuccessResponse(data=result)
 
 @bp.route('/schoolSort', methods=['POST'])
 def schoolSort():
-    schoolgroup = db.session.query(ForumArticle.author_school, func.count('*').label('count')).group_by(
-        ForumArticle.author_school).all()
+    schoolgroup = db.session.query(
+        ForumArticle.author_school,
+        func.count('*').label('count')
+    ).group_by(
+        ForumArticle.author_school
+    ).order_by(
+        func.count('*').desc()
+    ).all()
     result = []
     index = 1
     for row in schoolgroup:
         if index > 5:
             return
-        school = SchoolInfo.query.filter_by(en_name=row.author_school).first()
+        school = SchoolInfo.query.filter_by(ch_name=row.author_school).first()
         info = {
             'en_name': row.author_school,
             'count': row.count,
