@@ -9,8 +9,8 @@ import config
 from Audit.imageAudit import image_audit
 from Audit.textAudit import textAudit
 from functions import CustomResponse, SuccessResponse, uploadFile2Local
-from decorators import check_params, login_required, rate_limit
-from exts import db
+from decorators import check_params, login_required, rate_limit, check_open_comment
+from exts import db, cache
 from models import LikeRecord, UserMessage, ForumComment, ForumArticle, UserInfo
 from static.enums import globalinfoEnum, MessageTypeEnum, FileUploadTypeEnum, UserOperFrequencyTypeEnum
 
@@ -18,6 +18,7 @@ bp = Blueprint("ForumComment", __name__, url_prefix="/comment")
 
 
 @bp.route("/loadComment", methods=['POST'])
+@check_open_comment
 def loadArticle():
     articleid = request.values.get('articleId')
     pageno = request.values.get('pageNo')
@@ -25,8 +26,6 @@ def loadArticle():
         pageno = 1
     ordertype = request.values.get('orderType')  # 0:最新 1:最热
     userinfo = session.get("userInfo")
-    if not g.commentInfo.getcommentOpen():
-        abort(500, description="未开启评论")
     # 查询数据总数
     total_count = db.session.query(func.count(ForumComment.comment_id)).filter_by(
         p_comment_id=0, article_id=articleid, status=1, audit=1).scalar()
@@ -67,7 +66,8 @@ def loadArticle():
 
 
 def get_comments(pcomment_list, userinfo, articleid):
-    comments = ForumComment.query.filter(ForumComment.p_comment_id != 0, ForumComment.article_id == articleid).all()
+    comments = ForumComment.query.filter(ForumComment.p_comment_id != 0, ForumComment.article_id == articleid,
+                                         ForumComment.status == 1, ForumComment.audit == 1).all()
     childrenlist = {}
     result = []
     for item in comments:
@@ -114,6 +114,7 @@ def dolike():
 
 
 @bp.route("/postComment", methods=['POST'])
+@check_open_comment
 @login_required
 @rate_limit(limit_type=UserOperFrequencyTypeEnum.POST_COMMENT)
 def postcomment():
@@ -197,7 +198,7 @@ def post(comment, image):
         uploaddto = uploadFile2Local(image, config.PICTURE_FOLDER, FileUploadTypeEnum.COMMENT_IMAGE)
         comment.img_path = uploaddto.getlocalPath()
     db.session.add(comment)
-    if g.auditInfo.getPostAudit():
+    if cache.get('audit')['commentAudit']:
         comment.status = 1
         contentaudit = True
         imageaudit = True

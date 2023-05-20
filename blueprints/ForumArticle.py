@@ -15,7 +15,7 @@ from Audit.textAudit import textAudit
 from functions import SuccessResponse, convert_line_to_tree, generate_random_string, \
     uploadFile2Local, generate_random_number, getImageList
 from decorators import check_params, login_required, rate_limit
-from exts import db
+from exts import db, cache
 from models import ForumBoard, ForumArticle, ForumArticleAttachment, LikeRecord, UserMessage
 from static.enums import globalinfoEnum, MessageTypeEnum, FileUploadTypeEnum, AttachmentTypeEnum, \
     UserOperFrequencyTypeEnum
@@ -106,11 +106,12 @@ def getArticleDetail():
     articleid = request.values.get('articleId')
     article = ForumArticle.query.filter_by(article_id=articleid).first()
     # 判断是否可以访问
-    if not article or (article.status != 1 and (
-            session.get('userInfo') is None or json.loads(session['userInfo']).get(
-        'userId') != article.author_id or not
-            session['isAdmin'])):
-        abort(404)
+    if not article or article.status != 1:
+        abort(400, description="文章不存在")
+
+    if article.audit != 1:
+        if not session.get('userInfo') or ( not session['userInfo'].get('isAdmin') and (session['userInfo'].get('userId') != article.author_id)):
+            abort(400, description="访问地址不存在")
     # 打包返回结果
     article.read_count += 1
     result = {}
@@ -257,10 +258,9 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
             board = ForumBoard.query.filter_by(p_board_id=0, board_id=forumarticle.p_board_id).first()
             if not board:
                 abort(400)
-            forumarticle.cover = board.cover
-        else:
-            fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
-            forumarticle.cover = fileuploaddto.getlocalPath()
+            cover = Image.open(config.IMAGE_PATH + config.BOARD_FOLDER + "/" + board.cover)
+        fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
+        forumarticle.cover = fileuploaddto.getlocalPath()
         # 如果有附件则上传
         if attachment:
             uploadAttachment(forumarticle, forumattachment, attachment, False)
@@ -271,7 +271,7 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
         forumarticle.status = 1
         contentaudit = True
         imageaudit = True
-        if g.auditInfo.getPostAudit():
+        if cache.get('audit')['postAudit']:
             contentaudit = textAudit(forumarticle.content)
             if cover:
                 imageaudit = image_audit(config.IMAGE_PATH + '/' + forumarticle.cover)
@@ -391,7 +391,7 @@ def updateArticle():
 
     update(forumarticle, forumattachment, cover, attachment, userinfo.get('isAdmin'))
     db.session.commit()
-    return SuccessResponse(data=forumarticle.article_id)
+    return SuccessResponse(data=forumarticle.to_dict())
 
 
 def update(forumarticle, forumattachment, cover, attachment, isadmin):
@@ -406,7 +406,7 @@ def update(forumarticle, forumattachment, cover, attachment, isadmin):
     forumarticle.status = 1
     if g.auditInfo.getPostAudit():
         textaudit = textAudit(forumarticle.content)
-        imageaudit = False
+        imageaudit = True
         if cover:
             imageaudit = image_audit(config.IMAGE_PATH + '/' + forumarticle.cover)
         if textaudit and imageaudit:

@@ -199,7 +199,7 @@ def loadMessageList():
         abort(400)
     UserMessage.query \
         .filter_by(received_user_id=userinfo['userId'], message_type=typeEnum.value.get('type'), status=1) \
-        # .update({UserMessage.status: 2})
+        .update({UserMessage.status: 2})
 
     usermessage = UserMessage.query \
         .filter_by(received_user_id=userinfo['userId'], message_type=typeEnum.value.get('type')) \

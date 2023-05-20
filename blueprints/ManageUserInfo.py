@@ -15,23 +15,31 @@ bp = Blueprint("ManageUserInfo", __name__, url_prefix="/manageUser")
 @check_admin
 def loadUserList():
     pageNo = request.values.get('pageNo')
+    pageSize=request.values.get('pageSize')
     nickNameFuzzy = request.values.get('nickNameFuzzy')
     sex = request.values.get('sex')
     status = request.values.get('status')
+    school=request.values.get('school')
     users = UserInfo.query.order_by(UserInfo.join_time.desc())
     if not pageNo:
         pageNo = None
     else:
         pageNo = int(pageNo)
+    if not pageSize:
+        pageSize=globalinfoEnum.PageSize.value
+    else:
+        pageSize=int(pageSize)
     if nickNameFuzzy:
         users = users.filter(UserInfo.nick_name.like(f'%{nickNameFuzzy}%'))
+    if school:
+        users = users.filter(UserInfo.school.like(f'%{school}%'))
     if sex:
         users = users.filter_by(sex=int(sex))
     if status:
         users = users.filter_by(status=int(status))
 
     totalcount = users.count()
-    users = users.paginate(page=pageNo, per_page=globalinfoEnum.PageSize.value, error_out=False)
+    users = users.paginate(page=pageNo, per_page=pageSize, error_out=False)
     list = []
     for item in users.items:
         item.join_time = item.join_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -41,9 +49,9 @@ def loadUserList():
         list.append(dict)
     result = {
         'totalCount': totalcount,
-        'pageSize': globalinfoEnum.PageSize.value,
-        'pageNo': users.page,
-        'pageTotal': ceil(totalcount / globalinfoEnum.PageSize.value),
+        'pageSize': pageSize,
+        'pageNo': pageNo,
+        'pageTotal': ceil(totalcount / pageSize),
         'list': list
     }
     return SuccessResponse(data=result)

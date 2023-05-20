@@ -2,6 +2,8 @@ from datetime import datetime
 from math import ceil
 from flask import Blueprint, request, abort, make_response, send_file, session
 from sqlalchemy import desc, func
+
+import config
 from decorators import check_params, check_admin
 from exts import db
 from functions import SuccessResponse
@@ -27,19 +29,25 @@ def resetBoardInfo(isAdmin, article):
         article.board_name = None
 
 
-@bp.route("/loadArticle", methods=['POST'])
+@bp.route("/loadArticle", methods=['GET', 'POST'])
 @check_admin
 def loadArticle():
     pageNo = request.values.get('pageNo')
+    pageSize = request.values.get(('pageSize'))
     titleFuzzy = request.values.get('titleFuzzy')
     nickNameFuzzy = request.values.get('nickNameFuzzy')
     attachmentType = request.values.get('attachmentType')
     status = request.values.get('status')
+    audit = request.values.get('audit')
+    boardIds = request.values.get('boardIds')
     if pageNo:
         pageNo = int(pageNo)
     else:
         pageNo = None
-
+    if not pageSize:
+        pageSize = globalinfoEnum.PageSize.value
+    else:
+        pageSize = int(pageSize)
     articles = ForumArticle.query.order_by(ForumArticle.post_time.desc())
     if titleFuzzy:
         articles = articles.filter(ForumArticle.title.like(f'%{titleFuzzy}%'))
@@ -49,9 +57,16 @@ def loadArticle():
         articles = articles.filter(ForumArticle.attachment_type == int(attachmentType))
     if status:
         articles = articles.filter(ForumArticle.status == int(status))
+    if audit != "":
+        articles = articles.filter(ForumArticle.audit == int(audit))
+    if boardIds:
+        id_list = boardIds.split(",")
+        if len(id_list) > 1:
+            articles = articles.filter(ForumArticle.board_id == id_list[1])
+        articles = articles.filter(ForumArticle.p_board_id == id_list[0])
 
     total = articles.count()
-    articles = articles.paginate(page=pageNo, per_page=globalinfoEnum.PageSize.value)
+    articles = articles.paginate(page=pageNo, per_page=pageSize, error_out=False).items
     list = []
     for item in articles:
         item.post_time = item.post_time.strftime('%Y-%m-%d %H:%M:%S')
@@ -59,9 +74,9 @@ def loadArticle():
         list.append(item.to_dict())
     result = {
         'totalCount': total,
-        'pageSize': globalinfoEnum.PageSize.value,
-        'pageNo': articles.page,
-        'pageTotal': ceil(total / globalinfoEnum.PageSize.value),
+        'pageSize': pageSize,
+        'pageNo': pageNo,
+        'pageTotal': ceil(total / pageSize),
         'list': list
     }
     return SuccessResponse(data=result)
@@ -119,9 +134,8 @@ def getAttachment():
     return SuccessResponse(data=attachment.to_dict())
 
 
-@bp.route("/attachmentDownload", methods=['POST'])
+@bp.route("/attachmentDownload")
 @check_admin
-@check_params
 def attachmentDownload():
     fileid = request.values.get('fileId')
     file = ForumArticleAttachment.query.filter_by(file_id=fileid).first()
@@ -140,7 +154,7 @@ def attachmentDownload():
         db.session.commit()
         filename = file.file_name
         filename = filename.encode("utf-8").decode("latin1")  # 编码转换
-        response = make_response(send_file(file.file_path))
+        response = make_response(send_file(config.FILE_PATH + config.ATTACHMENT_FOLDER + "/" + file.file_path))
         response.headers["Content-Disposition"] = "attachment; filename={}".format(filename)
         return response
 
@@ -170,11 +184,19 @@ def singleaudit(articleid):
 def loadComment():
     articleid = request.values.get('articleId')
     pageno = request.values.get('pageNo')
+    pageSize=request.values.get('pageSize')
     contentFuzzy = request.values.get('contentFuzzy')
     nickNameFuzzy = request.values.get('nickNameFuzzy')
     status = request.values.get('status')
+    audit=request.values.get('audit')
     if not pageno:
         pageno = 1
+    else:
+        pageno=int(pageno)
+    if not pageSize:
+        pageSize=globalinfoEnum.PageSize.value
+    else:
+        pageSize=int(pageSize)
     userinfo = session['userInfo']
     comments = ForumComment.query.order_by(ForumComment.post_time.desc())
     if articleid:
@@ -185,18 +207,19 @@ def loadComment():
         comments = comments.filter(ForumComment.nick_name.like(f'%{nickNameFuzzy}%'))
     if status:
         comments = comments.filter(ForumComment.status == status)
+    if audit:
+        comments = comments.filter(ForumComment.audit == audit)
     totalcount = comments.count()
-
-    comments = comments.paginate(page=pageno, per_page=globalinfoEnum.PageSize.value, error_out=False)
+    comments = comments.paginate(page=pageno, per_page=pageSize, error_out=False)
     list = []
     for item in comments:
         item.post_time = item.post_time.strftime('%Y-%m-%d %H:%M:%S')
         list.append(item.to_dict())
     result = {
         'totalCount': totalcount,
-        'pageSize': globalinfoEnum.PageSize.value,
-        'pageNo': comments.page,
-        'pageTotal': ceil(totalcount / globalinfoEnum.PageSize.value),
+        'pageSize': pageSize,
+        'pageNo': pageno,
+        'pageTotal': ceil(totalcount / pageSize),
         'list': list
     }
     return SuccessResponse(data=result)
@@ -293,7 +316,7 @@ def auditComment():
 
 def singleauditcomment(commentid):
     comment = ForumComment.query.filter_by(comment_id=commentid).first()
-    if not comment or comment.status != 0:
+    if not comment or comment.status == -1:
         return
     comment.status = 1
     comment.audit = 1

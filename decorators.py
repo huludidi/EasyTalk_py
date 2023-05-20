@@ -3,6 +3,7 @@ from functools import wraps
 
 from flask import request, session, abort, jsonify, g
 
+from exts import cache
 from functions import CustomResponse
 from static.enums import UserOperFrequencyTypeEnum
 
@@ -40,7 +41,14 @@ def check_params(func):
         return func(*args, **kwargs)
 
     return inner
-
+# 评论是否开启
+def check_open_comment(func):
+    @wraps(func)
+    def inner(*args, **kwargs):
+        if not cache.get('comment')['commentOpen']:
+            abort(400, description="管理员未开启评论")
+        return func(*args, **kwargs)
+    return inner
 
 # 频次校验装饰器
 def rate_limit(limit_type):
@@ -81,25 +89,25 @@ def rate_limit(limit_type):
 
             #     发布评论频次校验
             if limit_type == UserOperFrequencyTypeEnum.POST_COMMENT:
-                if access_count['comment'] >= g.commentInfo.getcommentDayCountThreshold():
+                if access_count['comment'] >= cache.get('comment')['commentDayCountThreshold']:
                     abort(400, description="您今日评论数量过多，请明天再来吧~")
                 else:
                     access_count['comment'] += 1
             # 发布文章频次校验
             elif limit_type == UserOperFrequencyTypeEnum.POST_ARTICLE:
-                if access_count['article'] >= g.postInfo.getpostDayCountThreshold():
+                if access_count['article'] >= cache.get('post')['postDayCountThreshold']:
                     abort(400, description="您今日发布的内容数量过多，请明天再来吧~")
                 else:
                     access_count['article'] += 1
             # 上传图片频次校验
             elif limit_type == UserOperFrequencyTypeEnum.IMAGE_UPLOAD:
-                if access_count['image'] >= g.postInfo.getdayImageUploadCount():
+                if access_count['image'] >= cache.get('post')['dayImageUploadCount']:
                     abort(400, description="您今日发布的图片数量过多，请明天再来吧~")
                 else:
                     access_count['image'] += 1
             # 点赞频次校验
             elif limit_type == UserOperFrequencyTypeEnum.DO_LIKE:
-                if access_count['like'] >= g.likeInfo.getlikeDayCountThreshold():
+                if access_count['like'] >= cache.get('like')['likeDayCountThreshold']:
                     abort(400, description="您今日点赞过多，请明天再来吧~")
                 else:
                     access_count['like'] += 1
