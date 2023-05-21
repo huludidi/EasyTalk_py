@@ -39,28 +39,30 @@ def allowed_file(filename):
 
 @bp.route("/getImage/<imageFolder>/<imageName>", methods=['GET'])
 def getImage(imageFolder, imageName):
-    if request.method == 'GET':
+    if not imageFolder or not imageName:
+        filepath = config.IMAGE_PATH + '/EasyTalk.png'
+    else:
         filepath = config.IMAGE_PATH + '/' + imageFolder + '/' + imageName
-        if not os.path.exists(filepath):
-            filepath = config.IMAGE_PATH + '/EasyTalk.png'
-            # abort(400)
-        # 检测图片格式
-        with open(filepath, 'rb') as f:
-            data = f.read(16)
-        if data[:2] == b'\xff\xd8':  # JPEG/JFIF
-            mimetype = 'image/jpeg'
-        elif data[:3] == b'BM\x00':  # BMP
-            mimetype = 'image/bmp'
-        elif data[:8] == b'\x89PNG\r\n\x1a\n':
-            mimetype = 'image/png'
-        elif data[:6] in (b'GIF87a', b'GIF89a'):
-            mimetype = 'image/gif'
-        else:
-            mimetype = 'application/octet-stream'
-        # 设置缓存
-        response = make_response(send_file(filepath, mimetype=mimetype))
-        response.headers['Cache-Control'] = 'max-age=86400'  # 缓存有效期1天
-        return response
+    if not os.path.exists(filepath):
+        filepath = config.IMAGE_PATH + '/EasyTalk.png'
+        # abort(400)
+    # 检测图片格式
+    with open(filepath, 'rb') as f:
+        data = f.read(16)
+    if data[:2] == b'\xff\xd8':  # JPEG/JFIF
+        mimetype = 'image/jpeg'
+    elif data[:3] == b'BM\x00':  # BMP
+        mimetype = 'image/bmp'
+    elif data[:8] == b'\x89PNG\r\n\x1a\n':
+        mimetype = 'image/png'
+    elif data[:6] in (b'GIF87a', b'GIF89a'):
+        mimetype = 'image/gif'
+    else:
+        mimetype = 'application/octet-stream'
+    # 设置缓存
+    response = make_response(send_file(filepath, mimetype=mimetype))
+    response.headers['Cache-Control'] = 'max-age=86400'  # 缓存有效期1天
+    return response
 
 
 @bp.route("/getAvatar/<userId>")

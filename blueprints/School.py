@@ -92,7 +92,7 @@ def schoolSort():
     result = []
     index = 1
     for row in schoolgroup:
-        if index > 5:
+        if index > 10:
             return
         school = SchoolInfo.query.filter_by(ch_name=row.author_school).first()
         if school:

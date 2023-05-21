@@ -110,7 +110,8 @@ def getArticleDetail():
         abort(400, description="文章不存在")
 
     if article.audit != 1:
-        if not session.get('userInfo') or ( not session['userInfo'].get('isAdmin') and (session['userInfo'].get('userId') != article.author_id)):
+        if not session.get('userInfo') or (
+                not session['userInfo'].get('isAdmin') and (session['userInfo'].get('userId') != article.author_id)):
             abort(400, description="访问地址不存在")
     # 打包返回结果
     article.read_count += 1
@@ -258,7 +259,7 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
             board = ForumBoard.query.filter_by(p_board_id=0, board_id=forumarticle.p_board_id).first()
             if not board:
                 abort(400)
-            cover = Image.open(config.IMAGE_PATH + config.BOARD_FOLDER + "/" + board.cover)
+            cover = Image.open(config.IMAGE_PATH + "/" + board.cover)
         fileuploaddto = uploadFile2Local(cover, config.PICTURE_FOLDER, FileUploadTypeEnum.ARTICLE_COVER)
         forumarticle.cover = fileuploaddto.getlocalPath()
         # 如果有附件则上传

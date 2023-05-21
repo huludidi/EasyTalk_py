@@ -49,6 +49,7 @@ class MessageTypeEnum(Enum):
 
 
 class FileUploadTypeEnum(Enum):
+    Board_COVER = {"desc": "板块封面", "suffix": globalinfoEnum.IMAGE_SUFFIX.value}
     ARTICLE_COVER = {"desc": "文章封面", "suffix": globalinfoEnum.IMAGE_SUFFIX.value}
     ARTICLE_ATTACHMENT = {"desc": "文章附件", "suffix": globalinfoEnum.ATTACHMENT_SUFFIX.value}
     COMMENT_IMAGE = {"desc": "评论图片", "suffix": globalinfoEnum.IMAGE_SUFFIX.value}

@@ -5,7 +5,7 @@ from decorators import check_params, check_admin
 from exts import db
 from functions import SuccessResponse, convert_line_to_tree, uploadFile2Local
 from models import ForumBoard, ForumArticle
-from static.enums import  FileUploadTypeEnum
+from static.enums import FileUploadTypeEnum
 
 bp = Blueprint("ManageBoard", __name__, url_prefix="/manageBoard")
 
@@ -24,18 +24,19 @@ def loadBoard():
 @bp.route("/saveBoard", methods=['POST'])
 @check_admin
 def saveBoard():
-    boardId = request.values.get('boardId')
-    pBoardId = request.values.get('pBoardId')
-    boardName = request.values.get('boardName')
-    boardDesc = request.values.get('boardDesc')
+    postType = (request.values.get('post_type') == 'true')
+    boardId = request.values.get('board_id')
+    pBoardId = request.values.get('p_board_id')
+    boardName = request.values.get('board_name')
+    boardDesc = request.values.get('board_desc')
     cover = request.files.get('cover')
     if not pBoardId or not boardName or not boardDesc:
         abort(400)
-
     if boardId:  # 修改
         board = ForumBoard.query.filter_by(board_id=boardId).first()
         if not board:
             abort(400, description="板块信息不存在")
+        board.post_type = postType
         board.p_board_id = pBoardId
         board.board_desc = boardDesc
         if board.board_name != boardName:
@@ -51,7 +52,7 @@ def saveBoard():
         db.session.add(board)
     if cover:
         uploadDto = uploadFile2Local(cover, config.PICTURE_FOLDER + config.BOARD_FOLDER,
-                                     FileUploadTypeEnum.ARTICLE_COVER)
+                                     FileUploadTypeEnum.Board_COVER)
         board.cover = uploadDto.getlocalPath()
     try:
         db.session.commit()
@@ -84,14 +85,16 @@ def updateBoardNameBatch(boardname, boardtype, boardid):
 @check_admin
 @check_params
 def delBoard():
-    boardId = request.values.get('boardId')
+    boardId = request.values.get('board_id')
     article = ForumArticle.query.filter_by(board_id=boardId).first()
     if article:
         abort(400, description="此板块已有发布的内容，请勿删除")
     board = ForumBoard.query.filter_by(board_id=boardId).first()
     if board:
+        if board.p_board_id==0:
+            ForumBoard.query.filter_by(p_board_id=boardId).delete()
         db.session.delete(board)
-        db.session.commit()
+    db.session.commit()
     return SuccessResponse()
 
 
@@ -99,7 +102,7 @@ def delBoard():
 @check_admin
 @check_params
 def changeSort():
-    boardId = request.values.get('boardId')
+    boardId = request.values.get('boardIds')
     # 传入排好序的id数组
     boardId_dict = boardId.split(",")
     for index, value in enumerate(boardId_dict):

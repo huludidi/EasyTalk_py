@@ -14,6 +14,7 @@ from models import SysSetting
 from static.enums import FileUploadTypeEnum
 from static.globalDto import FileUpload, SysSettingDto
 
+
 # 刷新缓存
 def refresh_cache():
     cache.clear()
@@ -34,6 +35,8 @@ def refresh_cache():
             syssettingDto.setRegister(json.loads(setting.json_content))
         cache.set(setting.code, json.loads(setting.json_content))  # 将数据放入缓存
     return syssettingDto.to_dict()
+
+
 # 获取板块
 def convert_line_to_tree(data_list, pid):
     children = []
@@ -43,15 +46,18 @@ def convert_line_to_tree(data_list, pid):
             children.append(m)
     return children
 
+
 # 生成一个由 15 个随机数字组成的字符串
 def generate_random_number(length):
     numbers = ''.join(random.choice(string.digits) for _ in range(15))
     return numbers
 
+
 # 随机生成字符串
 def generate_random_string(length):
     letters = string.ascii_lowercase + string.ascii_uppercase + string.digits
     return ''.join(random.choice(letters) for i in range(length))
+
 
 #  HTML 中的图片地址提取
 def getImageList(html):
@@ -64,6 +70,7 @@ def getImageList(html):
         for image_url in m:
             image_list.append(image_url[0])
     return image_list
+
 
 # 图片上传
 def uploadFile2Local(file, folder, uploadtypeenum):
@@ -91,7 +98,9 @@ def uploadFile2Local(file, folder, uploadtypeenum):
             # 将图片转换为 JPG 格式
             file = Image.open(file.stream)
             file = file.convert('RGB')
-
+        if uploadtypeenum == FileUploadTypeEnum.Board_COVER:
+            targetfolder = basepath + folder
+            localpath = 'board/' + filename
 
         # 判断文件路径是否存在，不存在则创建
         if not os.path.exists(targetfolder):
@@ -108,7 +117,7 @@ def uploadFile2Local(file, folder, uploadtypeenum):
             # 保存一份缩略图
             thumbnailname = filename.replace(".", "_.")  # 缩略图文件名
             image.save(targetfolder + '/' + thumbnailname)
-        elif uploadtypeenum == FileUploadTypeEnum.AVATAR or uploadtypeenum == FileUploadTypeEnum.ARTICLE_COVER:
+        elif uploadtypeenum == FileUploadTypeEnum.AVATAR or uploadtypeenum == FileUploadTypeEnum.ARTICLE_COVER or uploadtypeenum == FileUploadTypeEnum.Board_COVER:
             image = Image.open(targetfolder + '/' + filename)
             size = (200, 200)
             file = image.resize(size)
@@ -133,6 +142,7 @@ def SuccessResponse(data=None):
         'info': info,
         'data': data
     })
+
 
 class CustomResponse:
     def __init__(self, status=None, code=None, info=None, data=None):
