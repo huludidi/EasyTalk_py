@@ -1,10 +1,10 @@
 import json
 
 from flask import Flask, g, jsonify
+from flask.cli import with_appcontext
 from werkzeug.exceptions import BadRequest
 
 from exts import db, mail, cache
-from functions import refresh_cache
 from models import SysSetting
 import config
 from blueprints.LoginAndRegister import bp as lar_bp
@@ -19,6 +19,7 @@ from blueprints.SysSetting import bp as ss_bp
 from blueprints.ManageUserInfo import bp as mui_bp
 from blueprints.ManageDataShow import bp as mds_bp
 from blueprints.School import bp as s_bp
+from blueprints.ForumResource import bp as fr_bp
 
 
 from flask_migrate import Migrate
@@ -39,6 +40,7 @@ app.register_blueprint(ss_bp)
 app.register_blueprint(mui_bp)
 app.register_blueprint(mds_bp)
 app.register_blueprint(s_bp)
+app.register_blueprint(fr_bp)
 
 
 db.init_app(app)
@@ -47,10 +49,6 @@ mail.init_app(app)
 cache.init_app(app)
 
 with app.app_context():
-    system_settings = SysSetting.query.all()  # 从数据库中获取系统设置数据
-    for setting in system_settings:
-        cache.set(setting.code, json.loads(setting.json_content))  # 将数据放入缓存
-
     @app.before_request
     def my_before_request():
         # 注册设置
@@ -122,7 +120,12 @@ def code_500_error(error):
     }
     return jsonify(error_message), 422
 
+def create_cache():
+    system_settings = SysSetting.query.all()  # 从数据库中获取系统设置数据
+    for setting in system_settings:
+        cache.set(setting.code, json.loads(setting.json_content))  # 将数据放入缓存
 
 
 if __name__ == '__main__':
+    print("111")
     app.run()

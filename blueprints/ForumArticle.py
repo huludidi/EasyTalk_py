@@ -13,7 +13,7 @@ from flask import Blueprint, request, session, abort, make_response, send_file, 
 from Audit.imageAudit import image_audit
 from Audit.textAudit import textAudit
 from functions import SuccessResponse, convert_line_to_tree, generate_random_string, \
-    uploadFile2Local, generate_random_number, getImageList
+    uploadFile2Local, generate_random_number, getImageList, refresh_cache
 from decorators import check_params, login_required, rate_limit
 from exts import db, cache
 from models import ForumBoard, ForumArticle, ForumArticleAttachment, LikeRecord, UserMessage
@@ -78,6 +78,7 @@ def uploadAttachment(article, forumattachment, file, isupload):
 
 @bp.route("/loadArticle", methods=['POST'])
 def loadArticle():
+    refresh_cache()
     boardId = request.values.get('boardId')
     pBoardId = request.values.get('pBoardId')
     orderType = request.values.get('orderType')  # 0:点赞最多 1:评论最多
@@ -183,7 +184,7 @@ def attachmentDownload():
 @login_required
 def loadBoard4Post():
     userinfo = session['userInfo']
-    formboardinfo = ForumBoard.query.order_by('sort').all()
+    formboardinfo = ForumBoard.query.order_by('sort')
     if not userinfo.get('isAdmin'):
         formboardinfo = formboardinfo.filter_by(post_type=1)
     formboardinfoList = []

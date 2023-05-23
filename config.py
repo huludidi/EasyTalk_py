@@ -1,4 +1,4 @@
-
+AK = "TlmqzUKYCMAtfm9txrMq9nXBtGGEYkou"
 SECRET_KEY = "xiaoxiong"
 CACHE_TYPE = 'simple'
 # 数据库配置信息
