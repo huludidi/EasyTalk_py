@@ -7,7 +7,7 @@ from blueprints.forms import UpdateForm
 from decorators import check_params, login_required
 from exts import db
 from functions import SuccessResponse, uploadFile2Local
-from models import UserInfo, ForumArticle, LikeRecord, ForumComment, UserMessage
+from models import UserInfo, ForumArticle, LikeRecord, ForumComment, UserMessage, SchoolInfo
 from static.enums import globalinfoEnum, FileUploadTypeEnum, MessageTypeEnum
 
 bp = Blueprint("Ucenter", __name__, url_prefix="/ucenter")
@@ -129,6 +129,9 @@ def updateUserInfo():
         avatar = request.files.get('avatar')
         userinfo = session['userInfo']
 
+        db_info=SchoolInfo.query.filter_by(ch_name=school).first()
+        if not db_info:
+            abort(400,description="系统暂不支持此学校")
         user = UserInfo.query.filter_by(user_id=userinfo['userId']).first()
         user.sex = sex
         user.person_description = persondescription
@@ -141,7 +144,7 @@ def updateUserInfo():
         return SuccessResponse()
     else:
         print(form.errors)
-        abort(400)
+        abort(400,description=form.errors)
 
 
 @bp.route("/getMessageCount", methods=['POST'])
