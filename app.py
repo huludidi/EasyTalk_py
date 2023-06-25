@@ -1,7 +1,6 @@
 import json
 
 from flask import Flask, g, jsonify
-from flask.cli import with_appcontext
 from werkzeug.exceptions import BadRequest
 
 from exts import db, mail, cache
@@ -28,6 +27,11 @@ from static.globalDto import Audit, Comment, Like, Post, Register, SysSettingDto
 app = Flask(__name__)
 # 绑定配置文件
 app.config.from_object(config)
+db.init_app(app)
+mail.init_app(app)
+cache.init_app(app)
+migrate = Migrate(app, db)
+
 app.register_blueprint(lar_bp)
 app.register_blueprint(fa_bp)
 app.register_blueprint(fb_bp)
@@ -43,10 +47,8 @@ app.register_blueprint(s_bp)
 app.register_blueprint(fr_bp)
 
 
-db.init_app(app)
-migrate = Migrate(app, db)
-mail.init_app(app)
-cache.init_app(app)
+
+
 
 with app.app_context():
     @app.before_request
@@ -127,5 +129,4 @@ def create_cache():
 
 
 if __name__ == '__main__':
-    print("111")
     app.run()

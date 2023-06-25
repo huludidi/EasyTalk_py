@@ -172,7 +172,7 @@ def auditArticle():
 
 def singleaudit(articleid):
     article = ForumArticle.query.filter_by(article_id=articleid).first()
-    if not article or article.status != 1:
+    if not article or article.status == 1:
         return
     article.status = 1
     article.audit = 1

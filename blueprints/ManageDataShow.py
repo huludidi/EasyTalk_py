@@ -34,13 +34,14 @@ def scatterPlot():
     result = []
     for row in schoolgroup:
         school = SchoolInfo.query.filter_by(ch_name=row.school).first()
-        info = {
-            'ch_name': row.school,
-            'count': row.count,
-            'longitude': school.longitude,
-            'latitude': school.latitude
-        }
-        result.append(info)
+        if school:
+            info = {
+                'ch_name': row.school,
+                'count': row.count,
+                'longitude': school.longitude,
+                'latitude': school.latitude
+            }
+            result.append(info)
     return SuccessResponse(data=result)
 
 

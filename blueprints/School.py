@@ -123,5 +123,5 @@ def get_school_location(school):
     if not location:
         location = geolocator.geocode(school.ch_name)
     if not location:
-        abort(400,description=f'Could not find location for {school}')
+        abort(400,description=f'无法查找{school.ch_name}的位置，请考虑更新学校名或手动添加')
     return {'latitude': location.latitude, 'longitude': location.longitude}

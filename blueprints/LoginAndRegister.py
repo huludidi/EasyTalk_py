@@ -132,7 +132,7 @@ def login():
         try:
             # user_ip = request.remote_addr
             user_ip = '211.137.7.243'
-            # user_ip='67.84.0.0' 纽约地址
+            # user_ip='67.84.0.0' #纽约地址
             ipapi_url = f'https://ipapi.co/{user_ip}/json/'
             location = requests.get(ipapi_url, timeout=5).json()
             dict_location = {"country_name": "未知", "region": "未知", "city": "未知"}

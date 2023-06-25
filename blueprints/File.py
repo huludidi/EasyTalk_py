@@ -19,7 +19,7 @@ def uploadImage():
         abort(400, description="文件不存在")
     # 重写文件名字
     filename = generate_random_string(15) + '.' + file.filename.rsplit('.', 1)[1].lower()
-    if not allowed_file(filename):
+    if not allowed_image(filename):
         abort(400, description="文件格式不允许")
     file.save(config.IMAGE_PATH + config.TEMP_FOLDER + '/' + filename)
     if g.auditInfo.getPostAudit():
@@ -31,11 +31,32 @@ def uploadImage():
     # 读取文件数据
     return SuccessResponse(data=result)
 
+@bp.route("/uploadVideo", methods=['POST'])
+# @rate_limit(limit_type=UserOperFrequencyTypeEnum.IMAGE_UPLOAD)
+def uploadVideo():
+    file = request.files.get('file')
+    if not file:
+        abort(400, description="文件不存在")
+    # 重写文件名字
+    filename = generate_random_string(15) + '.' + file.filename.rsplit('.', 1)[1].lower()
+    if not allowed_video(filename):
+        abort(400, description="文件格式不允许")
+    file.save(config.FILE_PATH+config.VIDEO_FOLDER + config.TEMP_FOLDER + '/' + filename)
+    # if g.auditInfo.getPostAudit():
+    #     if not image_audit(config.IMAGE_PATH + config.TEMP_FOLDER + '/' + filename):
+    #         abort(400, description="图片违规，请选择合法图片")
+    result = {
+        'fileName': config.TEMP_FOLDER + "/" + filename
+    }
+    # 读取文件数据
+    return SuccessResponse(data=result)
 
-def allowed_file(filename):
+def allowed_image(filename):
     return '.' in filename and \
         filename.rsplit('.', 1)[1] in globalinfoEnum.IMAGE_SUFFIX.value
-
+def allowed_video(filename):
+    return '.' in filename and \
+        filename.rsplit('.', 1)[1] in globalinfoEnum.VIDEO_SUFFIX.value
 
 @bp.route("/getImage/<imageFolder>/<imageName>", methods=['GET'])
 def getImage(imageFolder, imageName):
@@ -62,6 +83,14 @@ def getImage(imageFolder, imageName):
     # 设置缓存
     response = make_response(send_file(filepath, mimetype=mimetype))
     response.headers['Cache-Control'] = 'max-age=86400'  # 缓存有效期1天
+    return response
+
+@bp.route("/getVideo/<videoFolder>/<videoName>", methods=['GET'])
+def getVideo(videoFolder, videoName):
+    if not videoFolder or not videoName:
+        abort(400,description="视频不存在")
+    filepath =config.FILE_PATH+ config.VIDEO_FOLDER + "/"+videoFolder+"/"+videoName
+    response = make_response(send_file(filepath))
     return response
 
 

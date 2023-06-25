@@ -1,6 +1,6 @@
 import html
-import json
 import os
+import shutil
 from math import ceil
 
 from PIL import Image
@@ -13,7 +13,7 @@ from flask import Blueprint, request, session, abort, make_response, send_file, 
 from Audit.imageAudit import image_audit
 from Audit.textAudit import textAudit
 from functions import SuccessResponse, convert_line_to_tree, generate_random_string, \
-    uploadFile2Local, generate_random_number, getImageList, refresh_cache
+    uploadFile2Local, generate_random_number, getImageList, refresh_cache, getVideoList
 from decorators import check_params, login_required, rate_limit
 from exts import db, cache
 from models import ForumBoard, ForumArticle, ForumArticleAttachment, LikeRecord, UserMessage
@@ -308,18 +308,47 @@ def post(forumarticle, forumattachment, cover, attachment, isadmin):
 def resetimage(html):
     month = datetime.now().strftime("%Y%m")
     imagelist = getImageList(html)
+    videolist = getVideoList(html)
+
     for img in imagelist:
         if img and 'temp' in img:
             imagepath = img.replace('/api/file/getImage/', '')
             imagefilename = month + '/' + img.split("/")[-1]
             # 如果没有文件夹则创建
             if not os.path.exists(config.IMAGE_PATH + '/' + month):
-                os.mkdir(config.IMAGE_PATH + month)
+                os.mkdir(config.IMAGE_PATH +"/"+ month)
             #     取出temp中的照片放入202305等文件夹
             image = Image.open(config.IMAGE_PATH + '/' + imagepath)
             image.save(config.IMAGE_PATH + '/' + imagefilename)
+    for video in videolist:
+        if video and 'temp' in video:
+            videopath = video.replace('/api/file/getVideo/', '')
+            videofilename = month + '/' + video.split("/")[-1]
+            # 如果没有文件夹则创建
+            if not os.path.exists(config.FILE_PATH+config.VIDEO_FOLDER + '/' + month):
+                os.mkdir(config.FILE_PATH+config.VIDEO_FOLDER +"/"+ month)
+            # 复制文件到目标文件夹中
+            src=config.FILE_PATH+config.VIDEO_FOLDER+"/"+videopath
+            dst=config.FILE_PATH+config.VIDEO_FOLDER +"/"+ month
+            shutil.copy(src, dst)
     return month
 
+@bp.route("/delArticle", methods=['POST'])
+@login_required
+def delArticle():
+    articleId=request.values.get('articleId')
+    article = ForumArticle.query.filter_by(article_id=articleId).first()
+    if session['userInfo'].get('userId')!=article.author_id:
+        abort(400,description="恁无权删除此文章")
+    article.status = -1
+    message = UserMessage(received_user_id=article.author_id,
+                          message_type=MessageTypeEnum.SYS.value.get('type'),
+                          create_time=datetime.now(),
+                          status=globalinfoEnum.NO_READ.value,
+                          message_content=f"您的{article.title}文章已被删除")
+    db.session.add(message)
+    db.session.commit()
+    return SuccessResponse()
 
 @bp.route("/articleDetail4Update", methods=['POST'])
 @login_required
@@ -451,14 +480,14 @@ def search():
         abort(400, description="请求参数过短")
     result = {
         'totalCount': 0,
-        'pageNo': 1,
+        'pageNo': pageNo,
         'pageSize': 7,
         'pageTotal': 0,
         'list': []
     }
     # 根据标题模糊查询文章
     articles = ForumArticle.query \
-        .filter(ForumArticle.title.like(f'%{keyword}%'), ForumArticle.audit == 1)
+        .filter(ForumArticle.title.like(f'%{keyword}%'), ForumArticle.audit == 1,ForumArticle.status==1)
     total = articles.count()
     articles = articles.paginate(page=pageNo, per_page=7).items
     for item in articles:

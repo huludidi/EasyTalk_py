@@ -70,7 +70,17 @@ def getImageList(html):
         for image_url in m:
             image_list.append(image_url[0])
     return image_list
-
+# 提取视频
+def getVideoList(html):
+    video_list = []
+    reg_ex_video = r'(<video.*src\s*=\s*(.*?)[^>]*?>)'
+    p_video = re.compile(reg_ex_video, re.IGNORECASE)
+    m_video = p_video.findall(html)
+    for vid in m_video:
+        m = re.compile(r'src\s*=\s*\"?(.*?)(\"|>|\\s+)').findall(vid[0])
+        for video_url in m:
+            video_list.append(video_url[0])
+    return video_list
 
 # 图片上传
 def uploadFile2Local(file, folder, uploadtypeenum):

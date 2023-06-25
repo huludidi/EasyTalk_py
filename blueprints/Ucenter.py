@@ -1,3 +1,4 @@
+from datetime import datetime
 from math import ceil
 
 from flask import Blueprint, request, abort, session
@@ -7,7 +8,7 @@ from blueprints.forms import UpdateForm
 from decorators import check_params, login_required
 from exts import db
 from functions import SuccessResponse, uploadFile2Local
-from models import UserInfo, ForumArticle, LikeRecord, ForumComment, UserMessage, SchoolInfo
+from models import UserInfo, ForumArticle, LikeRecord, ForumComment, UserMessage, SchoolInfo, EmailCode
 from static.enums import globalinfoEnum, FileUploadTypeEnum, MessageTypeEnum
 
 bp = Blueprint("Ucenter", __name__, url_prefix="/ucenter")
@@ -125,7 +126,8 @@ def updateUserInfo():
         sex = form.sex.data
         persondescription = form.personDescription.data
         school = form.school.data
-        schoolemail = form.schoolEmail.data
+        # schoolemail = form.schoolEmail.data
+        nickName = form.nickName.data
         avatar = request.files.get('avatar')
         userinfo = session['userInfo']
 
@@ -136,16 +138,68 @@ def updateUserInfo():
         user.sex = sex
         user.person_description = persondescription
         user.school = school
-        user.school_email = schoolemail
-
+        # user.school_email = schoolemail
+        user.nick_name=nickName
         if avatar:
             uploadFile2Local(avatar, userinfo['userId'], FileUploadTypeEnum.AVATAR)
+        # 更新session
+        session['userInfo']['school']=school
+        session['userInfo']['schoolEmail']=user.school_email
+        session['userInfo']['nickName']=nickName
+        # 更新文章
+        update_stmt = (
+            ForumArticle.__table__
+            .update()
+            .where(ForumArticle.author_id == userinfo['userId'])
+            .values(nick_name=nickName)
+        )
+        db.session.execute(update_stmt)
+        update_stmt = (
+            ForumArticle.__table__
+            .update()
+            .where(ForumArticle.author_id == userinfo['userId'])
+            .values(author_school=school)
+        )
+        db.session.execute(update_stmt)
         db.session.commit()
-        return SuccessResponse()
+        return SuccessResponse(data=session['userInfo'])
     else:
         print(form.errors)
         abort(400,description=form.errors)
 
+@bp.route("/bindSchoolEmail", methods=['POST'])
+@login_required
+@check_params
+def bindSchoolEmail():
+    userId=session['userInfo']['userId']
+    schoolEmail=request.values.get('schoolEmail')
+    code=request.values.get('emailCode')
+
+    #  检查邮箱验证码
+    dbInfo = EmailCode.query.get((schoolEmail, code))
+    if dbInfo is None:
+        abort(400, description="邮箱验证码不正确")
+    if dbInfo.status != 0 or (datetime.now() - dbInfo.create_time).seconds > 900:
+        abort(400, description="邮箱验证码已失效")
+    dbInfo.status = 1
+
+    user=UserInfo.query.filter_by(user_id=userId).first()
+    user.school_email=schoolEmail
+    db.session.commit()
+    return SuccessResponse()
+
+@bp.route("/cencelBindSchoolEmail", methods=['POST'])
+@login_required
+@check_params
+def cencelBindSchoolEmail():
+    userInfo = session['userInfo']
+    user = UserInfo.query.filter_by(user_id=userInfo['userId']).first()
+    if not user.school_email:
+        abort(400,description="用户还未绑定邮箱")
+    user.school_email=None
+    db.session.commit()
+    session['userInfo']['schoolEmail']=None
+    return SuccessResponse(data=session['userInfo'])
 
 @bp.route("/getMessageCount", methods=['POST'])
 def getMessageCount():

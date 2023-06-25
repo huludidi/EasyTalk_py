@@ -17,6 +17,7 @@ class globalinfoEnum(Enum):
     NO_READ = 1
     HAVE_READ = 2
     # 文件类型
+    VIDEO_SUFFIX = {'mp4'}
     IMAGE_SUFFIX = {'png', 'PNG', 'jpg', 'JPG', 'jpeg', 'JPEG', 'gif', 'GIF', 'bmp', 'BMP', }
     ATTACHMENT_SUFFIX = {'zip', 'ZIP', 'rar', 'RAR'}
     # 编辑器类型
